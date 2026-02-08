@@ -4,6 +4,33 @@ Complete step-by-step guide to build your Family Finance Hub using Claude Code.
 
 ---
 
+## 🔀 Git Workflow
+
+**IMPORTANT:** Always follow this workflow when making changes:
+
+1. **Never commit directly to `main`.** Always create a feature branch.
+2. **Branch naming:** Use descriptive names like `feat/<feature>`, `fix/<bug>`, `chore/<task>`.
+3. **After finishing work**, create a commit, push the branch, and open a PR targeting `main` using `gh pr create`.
+4. **Wait for the user to review and merge** the PR — do not merge it yourself.
+
+**Example workflow:**
+```bash
+git checkout -b feat/backend-setup
+# ... make changes ...
+git add <files>
+git commit -m "feat: setup backend project structure"
+git push -u origin feat/backend-setup
+gh pr create --title "feat: setup backend project structure" --body "..."
+```
+
+**Git config (already set):**
+- **user.name:** MateusPaiv
+- **user.email:** mateuspaiva0118@gmail.com
+- **remote origin:** git@github.com:MateusPaiv/finance-family-app.git
+- **main branch:** main
+
+---
+
 ## 📋 Project Overview
 
 **What we're building:** A multi-user family expense tracking app that runs on your Umbrel server.
