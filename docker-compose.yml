@@ -1,0 +1,49 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: finance-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: family_finance
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - finance-network
+
+  backend:
+    build: ./backend
+    container_name: finance-backend
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/family_finance?schema=public
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-use-openssl-rand-base64-32}
+      NODE_ENV: production
+      PORT: 3001
+      CORS_ORIGIN: http://localhost:3000
+      MAX_FILE_SIZE: 5242880
+    volumes:
+      - ./backend/uploads:/app/uploads
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "npx prisma migrate deploy && npm start"
+    networks:
+      - finance-network
+
+networks:
+  finance-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
