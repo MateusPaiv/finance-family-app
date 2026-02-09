@@ -12,6 +12,7 @@ import { Expenses } from '@/pages/Expenses';
 import { Categories } from '@/pages/Categories';
 import { PaymentMethods } from '@/pages/PaymentMethods';
 import { FixedBills } from '@/pages/FixedBills';
+import { IncomePage } from '@/pages/Income';
 import { FamilySharing } from '@/pages/FamilySharing';
 import { Reports } from '@/pages/Reports';
 import { Settings } from '@/pages/Settings';
@@ -183,6 +184,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <FixedBills />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/income"
+        element={
+          <ProtectedRoute>
+            <IncomePage />
           </ProtectedRoute>
         }
       />

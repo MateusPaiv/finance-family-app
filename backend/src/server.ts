@@ -13,6 +13,7 @@ import expenseRoutes from "./routes/expenses.routes.js";
 import categoryRoutes from "./routes/categories.routes.js";
 import paymentMethodRoutes from "./routes/paymentMethods.routes.js";
 import fixedBillRoutes from "./routes/fixedBills.routes.js";
+import incomeRoutes from "./routes/income.routes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -56,6 +57,7 @@ app.use("/api/expenses", expenseRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/payment-methods", paymentMethodRoutes);
 app.use("/api/fixed-bills", fixedBillRoutes);
+app.use("/api/incomes", incomeRoutes);
 
 // ─── 404 handler ─────────────────────────────────────────────────────────────
 

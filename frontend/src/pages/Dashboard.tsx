@@ -18,6 +18,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useExpenses, useMonthlySummary } from '@/hooks/useExpenses';
 import { useFixedBills, useFixedBillsSummary, usePayFixedBill } from '@/hooks/useFixedBills';
 import { useBudgetOverview } from '@/hooks/useCategories';
+import { useIncomeSummary } from '@/hooks/useIncomes';
 import { cn } from '@/lib/utils';
 
 export function Dashboard() {
@@ -33,14 +34,16 @@ export function Dashboard() {
   const { data: fixedBills } = useFixedBills();
   const { data: fixedBillsSummary } = useFixedBillsSummary();
   const { data: budgetOverview } = useBudgetOverview();
+  const { data: incomeSummary } = useIncomeSummary(year, month);
   const payBill = usePayFixedBill();
 
   // Calculate "What I Can Spend"
-  const totalBudget = budgetOverview?.reduce((sum, cat) => sum + cat.budgetLimit, 0) || 0;
+  // Formula: Income - Fixed Bills - Expenses = Available
+  const totalIncome = incomeSummary?.totalIncome || 0;
   const totalSpent = summary?.totalSpent || 0;
   const fixedBillsTotal = fixedBillsSummary?.totalMonthly || 0;
-  const availableToSpend = totalBudget - totalSpent - fixedBillsTotal;
-  const spendingPercentage = totalBudget > 0 ? ((totalSpent + fixedBillsTotal) / totalBudget) * 100 : 0;
+  const availableToSpend = totalIncome - totalSpent - fixedBillsTotal;
+  const spendingPercentage = totalIncome > 0 ? ((totalSpent + fixedBillsTotal) / totalIncome) * 100 : 0;
 
   const getSpendingColor = () => {
     if (spendingPercentage >= 90) return { bg: 'bg-error-light', text: 'text-error', bar: 'bg-error' };
@@ -103,7 +106,7 @@ export function Dashboard() {
                   What I Can Spend
                 </h2>
                 <p className="text-sm text-gray-500">
-                  Budget available this month
+                  Income - Fixed Bills - Expenses
                 </p>
               </div>
               <div className={cn('p-2 rounded-lg', colors.bg)}>
@@ -127,7 +130,7 @@ export function Dashboard() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">
-                    {formatCurrency(totalSpent + fixedBillsTotal)} of {formatCurrency(totalBudget)}
+                    {formatCurrency(totalSpent + fixedBillsTotal)} of {formatCurrency(totalIncome)}
                   </span>
                   <span className={cn('font-medium', colors.text)}>
                     {spendingPercentage.toFixed(0)}%
@@ -144,16 +147,16 @@ export function Dashboard() {
               {/* Breakdown */}
               <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-200">
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">Total Budget</p>
-                  <p className="text-sm font-semibold text-gray-900">{formatCurrency(totalBudget)}</p>
+                  <p className="text-xs text-gray-500 mb-1">Monthly Income</p>
+                  <p className="text-sm font-semibold text-green-600">{formatCurrency(totalIncome)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Fixed Bills</p>
-                  <p className="text-sm font-semibold text-gray-900">{formatCurrency(fixedBillsTotal)}</p>
+                  <p className="text-sm font-semibold text-orange-600">{formatCurrency(fixedBillsTotal)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Expenses</p>
-                  <p className="text-sm font-semibold text-gray-900">{formatCurrency(totalSpent)}</p>
+                  <p className="text-sm font-semibold text-red-600">{formatCurrency(totalSpent)}</p>
                 </div>
               </div>
             </div>

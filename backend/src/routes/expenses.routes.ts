@@ -43,7 +43,11 @@ const createExpenseSchema = z.object({
   date: z.string().optional(),
   categoryId: z.string().uuid().optional(),
   paymentMethodId: z.string().uuid().optional(),
-  isShared: z.coerce.boolean().optional().default(false),
+  isShared: z
+    .string()
+    .optional()
+    .transform((val) => val === "true")
+    .default(false),
   sharedWith: z
     .string()
     .optional()
@@ -59,7 +63,10 @@ const updateExpenseSchema = z.object({
   date: z.string().optional(),
   categoryId: z.string().uuid().nullable().optional(),
   paymentMethodId: z.string().uuid().nullable().optional(),
-  isShared: z.coerce.boolean().optional(),
+  isShared: z
+    .string()
+    .optional()
+    .transform((val) => val === "true"),
 });
 
 const querySchema = z.object({
