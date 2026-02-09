@@ -56,7 +56,7 @@ export async function createExpense(
   const { data } = await api.post<ApiResponse<Expense>>(
     '/api/expenses',
     formData,
-    { headers: { 'Content-Type': 'multipart/form-data' } },
+    { headers: { 'Content-Type': undefined } },
   );
   return data.data!;
 }
@@ -93,7 +93,7 @@ export async function updateExpense(
   const { data } = await api.put<ApiResponse<Expense>>(
     `/api/expenses/${id}`,
     formData,
-    { headers: { 'Content-Type': 'multipart/form-data' } },
+    { headers: { 'Content-Type': undefined } },
   );
   return data.data!;
 }
