@@ -40,10 +40,14 @@ const upload = multer({
 const createExpenseSchema = z.object({
   amount: z.coerce.number().positive("Amount must be positive"),
   description: z.string().optional(),
-  date: z.string().datetime().optional(),
+  date: z.string().optional(),
   categoryId: z.string().uuid().optional(),
   paymentMethodId: z.string().uuid().optional(),
-  isShared: z.coerce.boolean().optional().default(false),
+  isShared: z
+    .string()
+    .optional()
+    .transform((val) => val === "true")
+    .default(false),
   sharedWith: z
     .string()
     .optional()
@@ -56,10 +60,13 @@ const createExpenseSchema = z.object({
 const updateExpenseSchema = z.object({
   amount: z.coerce.number().positive().optional(),
   description: z.string().optional(),
-  date: z.string().datetime().optional(),
+  date: z.string().optional(),
   categoryId: z.string().uuid().nullable().optional(),
   paymentMethodId: z.string().uuid().nullable().optional(),
-  isShared: z.coerce.boolean().optional(),
+  isShared: z
+    .string()
+    .optional()
+    .transform((val) => val === "true"),
 });
 
 const querySchema = z.object({

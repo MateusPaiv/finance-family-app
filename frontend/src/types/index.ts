@@ -193,6 +193,41 @@ export interface FixedBillSummary {
   totalUnpaid: number;
 }
 
+// ─── Income ─────────────────────────────────────────────────────────────────
+
+export interface Income {
+  id: string;
+  userId: string;
+  amount: number;
+  description: string | null;
+  month: number;
+  year: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateIncomeRequest {
+  amount: number;
+  description?: string;
+  month: number;
+  year: number;
+}
+
+export interface UpdateIncomeRequest {
+  amount?: number;
+  description?: string;
+  month?: number;
+  year?: number;
+}
+
+export interface IncomeSummary {
+  year: number;
+  month: number;
+  totalIncome: number;
+  incomeCount: number;
+  incomes: Income[];
+}
+
 // ─── Monthly Summary ────────────────────────────────────────────────────────
 
 export interface MonthlySummary {

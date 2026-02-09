@@ -6,6 +6,7 @@ import {
   FolderOpen,
   CreditCard,
   Calendar,
+  DollarSign,
   Users,
   BarChart3,
   Settings,
@@ -25,6 +26,7 @@ interface NavItem {
 
 const navigation: NavItem[] = [
   { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} /> },
+  { name: 'Income', path: '/income', icon: <DollarSign size={20} /> },
   { name: 'Expenses', path: '/expenses', icon: <Receipt size={20} /> },
   { name: 'Categories', path: '/categories', icon: <FolderOpen size={20} /> },
   { name: 'Payment Methods', path: '/payment-methods', icon: <CreditCard size={20} /> },

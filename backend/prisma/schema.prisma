@@ -32,12 +32,13 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  paymentMethods  PaymentMethod[]
-  categories      Category[]
-  expenses        Expense[]
-  fixedBills      FixedBill[]
-  sharedExpenses  SharedExpense[] @relation("SharedWith")
-  createdShares   SharedExpense[] @relation("CreatedBy")
+  paymentMethods PaymentMethod[]
+  categories     Category[]
+  expenses       Expense[]
+  fixedBills     FixedBill[]
+  sharedExpenses SharedExpense[] @relation("SharedWith")
+  createdShares  SharedExpense[] @relation("CreatedBy")
+  incomes        Income[]
 
   @@map("users")
 }
@@ -127,4 +128,20 @@ model FixedBill {
   category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   @@map("fixed_bills")
+}
+
+model Income {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  amount      Decimal  @db.Decimal(12, 2)
+  description String?
+  month       Int
+  year        Int
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, year, month])
+  @@map("incomes")
 }
