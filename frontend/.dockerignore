@@ -1,0 +1,38 @@
+# Node modules
+node_modules
+npm-debug.log
+
+# Build output
+dist
+build
+
+# Development files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# Testing
+coverage
+.nyc_output
+
+# Misc
+*.log
+*.md
+README.md
+.editorconfig
+.eslintrc*
+.prettierrc*
