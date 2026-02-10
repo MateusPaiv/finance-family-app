@@ -28,7 +28,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production-use-openssl-rand-base64-32}
       NODE_ENV: production
       PORT: 3001
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3005}
       MAX_FILE_SIZE: 5242880
     volumes:
       - ./backend/uploads:/app/uploads
@@ -45,7 +45,7 @@ services:
     build: ./frontend
     container_name: finance-frontend
     ports:
-      - "3000:80"
+      - "3005:80"
     depends_on:
       - backend
     networks:
