@@ -163,10 +163,25 @@ export interface FixedBill {
   dueDay: number;
   recurrence: Recurrence;
   isPaid: boolean;
+  isShared: boolean;
   lastPaidAt: string | null;
   createdAt: string;
   updatedAt: string;
   category?: Category | null;
+  sharedWith?: SharedFixedBill[];
+}
+
+export interface SharedFixedBill {
+  id: string;
+  fixedBillId: string;
+  sharedWithId: string;
+  createdById: string;
+  splitAmount: number;
+  isPaid: boolean;
+  createdAt: string;
+  sharedWith?: User;
+  createdBy?: User;
+  fixedBill?: FixedBill;
 }
 
 export interface CreateFixedBillRequest {
@@ -175,6 +190,8 @@ export interface CreateFixedBillRequest {
   categoryId?: string;
   dueDay: number;
   recurrence: Recurrence;
+  isShared?: boolean;
+  sharedWith?: { userId: string; splitAmount: number }[];
 }
 
 export interface UpdateFixedBillRequest {
@@ -183,6 +200,8 @@ export interface UpdateFixedBillRequest {
   categoryId?: string | null;
   dueDay?: number;
   recurrence?: Recurrence;
+  isShared?: boolean;
+  sharedWith?: { userId: string; splitAmount: number }[];
 }
 
 export interface FixedBillSummary {

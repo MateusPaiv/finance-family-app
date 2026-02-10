@@ -6,17 +6,81 @@ import { authenticateToken } from "../middleware/auth.js";
 const router = Router();
 router.use(authenticateToken);
 
+const sharedWithItemSchema = z.object({
+  userId: z.string().uuid(),
+  splitAmount: z.number().positive(),
+});
+
 const fixedBillSchema = z.object({
   name: z.string().min(1, "Name is required"),
   amount: z.number().positive("Amount must be positive"),
   categoryId: z.string().uuid().optional(),
   dueDay: z.number().int().min(1).max(31),
   recurrence: z.enum(["MONTHLY", "YEARLY"]),
+  isShared: z.boolean().optional(),
+  sharedWith: z.array(sharedWithItemSchema).optional(),
 });
 
 const updateFixedBillSchema = fixedBillSchema.partial();
 
+// Shared include for all queries that return fixed bills
+const sharedWithInclude = {
+  category: true,
+  sharedWith: {
+    include: {
+      sharedWith: { select: { id: true, name: true, email: true } },
+      createdBy: { select: { id: true, name: true, email: true } },
+    },
+  },
+};
+
+// Helper to serialize a fixed bill (convert Decimals to Numbers)
+function serializeBill(bill: any) {
+  return {
+    ...bill,
+    amount: Number(bill.amount),
+    sharedWith: bill.sharedWith?.map((s: any) => ({
+      ...s,
+      splitAmount: Number(s.splitAmount),
+    })),
+  };
+}
+
 // ─── Static routes (before /:id) ────────────────────────────────────────────
+
+// GET /api/fixed-bills/shared/with-me
+router.get(
+  "/shared/with-me",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user!.userId;
+
+      const sharedBills = await prisma.sharedFixedBill.findMany({
+        where: { sharedWithId: userId },
+        include: {
+          fixedBill: {
+            include: { category: true },
+          },
+          createdBy: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      const data = sharedBills.map((s) => ({
+        ...s,
+        splitAmount: Number(s.splitAmount),
+        fixedBill: {
+          ...s.fixedBill,
+          amount: Number(s.fixedBill.amount),
+        },
+      }));
+
+      res.json({ status: "success", data });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 // GET /api/fixed-bills/upcoming/next-week
 router.get(
@@ -41,14 +105,11 @@ router.get(
           isPaid: false,
           dueDay: { in: upcomingDays },
         },
-        include: { category: true },
+        include: sharedWithInclude,
         orderBy: { dueDay: "asc" },
       });
 
-      const data = bills.map((b) => ({
-        ...b,
-        amount: Number(b.amount),
-      }));
+      const data = bills.map(serializeBill);
 
       res.json({ status: "success", data });
     } catch (error) {
@@ -101,14 +162,11 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
 
     const bills = await prisma.fixedBill.findMany({
       where: { userId },
-      include: { category: true },
+      include: sharedWithInclude,
       orderBy: { dueDay: "asc" },
     });
 
-    const data = bills.map((b) => ({
-      ...b,
-      amount: Number(b.amount),
-    }));
+    const data = bills.map(serializeBill);
 
     res.json({ status: "success", data });
   } catch (error) {
@@ -124,7 +182,7 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
 
     const bill = await prisma.fixedBill.findUnique({
       where: { id },
-      include: { category: true },
+      include: sharedWithInclude,
     });
 
     if (!bill || bill.userId !== userId) {
@@ -134,7 +192,7 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
 
     res.json({
       status: "success",
-      data: { ...bill, amount: Number(bill.amount) },
+      data: serializeBill(bill),
     });
   } catch (error) {
     next(error);
@@ -144,17 +202,44 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
 // POST /api/fixed-bills
 router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = fixedBillSchema.parse(req.body);
+    const { sharedWith, ...data } = fixedBillSchema.parse(req.body);
     const userId = req.user!.userId;
 
-    const bill = await prisma.fixedBill.create({
-      data: { ...data, userId },
-      include: { category: true },
+    const isShared = data.isShared && sharedWith && sharedWith.length > 0;
+
+    const bill = await prisma.$transaction(async (tx) => {
+      const created = await tx.fixedBill.create({
+        data: {
+          name: data.name,
+          amount: data.amount,
+          categoryId: data.categoryId,
+          dueDay: data.dueDay,
+          recurrence: data.recurrence,
+          isShared: isShared || false,
+          userId,
+        },
+      });
+
+      if (isShared && sharedWith) {
+        await tx.sharedFixedBill.createMany({
+          data: sharedWith.map((member) => ({
+            fixedBillId: created.id,
+            sharedWithId: member.userId,
+            createdById: userId,
+            splitAmount: member.splitAmount,
+          })),
+        });
+      }
+
+      return tx.fixedBill.findUnique({
+        where: { id: created.id },
+        include: sharedWithInclude,
+      });
     });
 
     res.status(201).json({
       status: "success",
-      data: { ...bill, amount: Number(bill.amount) },
+      data: serializeBill(bill),
     });
   } catch (error) {
     next(error);
@@ -166,7 +251,7 @@ router.put("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     const userId = req.user!.userId;
-    const data = updateFixedBillSchema.parse(req.body);
+    const { sharedWith, ...data } = updateFixedBillSchema.parse(req.body);
 
     const existing = await prisma.fixedBill.findUnique({ where: { id } });
     if (!existing || existing.userId !== userId) {
@@ -174,15 +259,42 @@ router.put("/:id", async (req: Request, res: Response, next: NextFunction) => {
       return;
     }
 
-    const bill = await prisma.fixedBill.update({
-      where: { id },
-      data,
-      include: { category: true },
+    const bill = await prisma.$transaction(async (tx) => {
+      const updated = await tx.fixedBill.update({
+        where: { id },
+        data: {
+          ...data,
+          isShared: data.isShared ?? existing.isShared,
+        },
+      });
+
+      // If sharedWith is provided, replace all shared records
+      if (sharedWith !== undefined) {
+        await tx.sharedFixedBill.deleteMany({
+          where: { fixedBillId: id },
+        });
+
+        if (sharedWith.length > 0) {
+          await tx.sharedFixedBill.createMany({
+            data: sharedWith.map((member) => ({
+              fixedBillId: id,
+              sharedWithId: member.userId,
+              createdById: userId,
+              splitAmount: member.splitAmount,
+            })),
+          });
+        }
+      }
+
+      return tx.fixedBill.findUnique({
+        where: { id },
+        include: sharedWithInclude,
+      });
     });
 
     res.json({
       status: "success",
-      data: { ...bill, amount: Number(bill.amount) },
+      data: serializeBill(bill),
     });
   } catch (error) {
     next(error);
@@ -229,12 +341,12 @@ router.post(
       const bill = await prisma.fixedBill.update({
         where: { id },
         data: { isPaid: true, lastPaidAt: new Date() },
-        include: { category: true },
+        include: sharedWithInclude,
       });
 
       res.json({
         status: "success",
-        data: { ...bill, amount: Number(bill.amount) },
+        data: serializeBill(bill),
       });
     } catch (error) {
       next(error);
@@ -259,12 +371,12 @@ router.post(
       const bill = await prisma.fixedBill.update({
         where: { id },
         data: { isPaid: false },
-        include: { category: true },
+        include: sharedWithInclude,
       });
 
       res.json({
         status: "success",
-        data: { ...bill, amount: Number(bill.amount) },
+        data: serializeBill(bill),
       });
     } catch (error) {
       next(error);
