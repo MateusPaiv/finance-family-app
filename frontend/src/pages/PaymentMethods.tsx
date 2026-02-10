@@ -206,6 +206,7 @@ export function PaymentMethods() {
               label="Total Methods"
               value={totalMethods}
               icon={<CreditCard size={20} />}
+              formatAsCurrency={false}
             />
             <StatCard
               label="Most Used"

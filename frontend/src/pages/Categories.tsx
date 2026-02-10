@@ -164,6 +164,7 @@ export function Categories() {
               label="Total Categories"
               value={totalCategories}
               icon={<TrendingUp size={20} />}
+              formatAsCurrency={false}
             />
             <StatCard
               label="Over Budget"
