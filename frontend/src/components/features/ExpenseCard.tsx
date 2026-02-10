@@ -11,10 +11,9 @@ export interface ExpenseCardProps {
 }
 
 export function ExpenseCard({ expense, onEdit, onDelete }: ExpenseCardProps) {
-  const formattedAmount = new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(expense.amount);
+  const fmt = (v: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+  const formattedAmount = fmt(expense.userAmount);
 
   const formattedDate = format(new Date(expense.date), 'dd/MM/yyyy');
 
@@ -54,9 +53,14 @@ export function ExpenseCard({ expense, onEdit, onDelete }: ExpenseCardProps) {
                   {formattedAmount}
                 </span>
                 {expense.isShared && (
-                  <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                    Shared
-                  </span>
+                  <>
+                    <span className="text-xs text-gray-400 line-through">
+                      {fmt(expense.amount)}
+                    </span>
+                    <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                      Shared
+                    </span>
+                  </>
                 )}
               </div>
 

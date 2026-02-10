@@ -71,7 +71,7 @@ export function Reports() {
 
   // Calculate stats
   const stats = useMemo(() => {
-    const totalSpent = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+    const totalSpent = filteredExpenses.reduce((sum, exp) => sum + exp.userAmount, 0);
     const expenseCount = filteredExpenses.length;
     const daysInRange = Math.ceil(
       (dateRange.end.getTime() - dateRange.start.getTime()) / (1000 * 60 * 60 * 24)
@@ -80,8 +80,8 @@ export function Reports() {
 
     // Highest expense
     const highestExpense = filteredExpenses.reduce(
-      (max, exp) => (exp.amount > max.amount ? exp : max),
-      filteredExpenses[0] || { amount: 0, description: 'N/A' }
+      (max, exp) => (exp.userAmount > max.userAmount ? exp : max),
+      filteredExpenses[0] || { amount: 0, userAmount: 0, description: 'N/A' }
     );
 
     // Most expensive category
@@ -90,12 +90,12 @@ export function Reports() {
       if (exp.category) {
         const existing = categoryTotals.get(exp.category.id);
         if (existing) {
-          existing.total += exp.amount;
+          existing.total += exp.userAmount;
         } else {
           categoryTotals.set(exp.category.id, {
             name: exp.category.name,
             emoji: exp.category.emoji,
-            total: exp.amount,
+            total: exp.userAmount,
           });
         }
       }
@@ -117,7 +117,7 @@ export function Reports() {
       const expDate = new Date(exp.date);
       return expDate >= previousStart && expDate < dateRange.start;
     });
-    const previousTotal = previousExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+    const previousTotal = previousExpenses.reduce((sum, exp) => sum + exp.userAmount, 0);
     const trendPercentage =
       previousTotal > 0 ? ((totalSpent - previousTotal) / previousTotal) * 100 : 0;
 
@@ -138,11 +138,11 @@ export function Reports() {
       if (exp.category) {
         const existing = categoryMap.get(exp.category.id);
         if (existing) {
-          existing.value += exp.amount;
+          existing.value += exp.userAmount;
         } else {
           categoryMap.set(exp.category.id, {
             name: exp.category.name,
-            value: exp.amount,
+            value: exp.userAmount,
             emoji: exp.category.emoji,
           });
         }
@@ -164,7 +164,7 @@ export function Reports() {
         return expDate >= monthStart && expDate <= monthEnd;
       });
 
-      const total = monthExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+      const total = monthExpenses.reduce((sum, exp) => sum + exp.userAmount, 0);
       months.push({
         month: format(date, 'MMM yyyy'),
         amount: total,
@@ -180,11 +180,11 @@ export function Reports() {
       if (exp.paymentMethod) {
         const existing = methodMap.get(exp.paymentMethod.id);
         if (existing) {
-          existing.amount += exp.amount;
+          existing.amount += exp.userAmount;
         } else {
           methodMap.set(exp.paymentMethod.id, {
             name: exp.paymentMethod.name,
-            amount: exp.amount,
+            amount: exp.userAmount,
           });
         }
       }
@@ -216,7 +216,7 @@ export function Reports() {
           expDate.getFullYear() === day.getFullYear()
         );
       });
-      const total = dayExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+      const total = dayExpenses.reduce((sum, exp) => sum + exp.userAmount, 0);
       return {
         date: format(day, 'dd/MM'),
         amount: total,
@@ -319,7 +319,7 @@ export function Reports() {
             />
             <StatCard
               label="Highest Expense"
-              value={stats.highestExpense.amount}
+              value={stats.highestExpense.userAmount}
               icon={<Award size={20} />}
             />
             <Card padding="md">

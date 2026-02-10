@@ -255,7 +255,7 @@ export function Dashboard() {
                           </span>
                           <span className="text-gray-400">•</span>
                           <span className="text-gray-900 font-medium">
-                            {formatCurrency(bill.amount)}
+                            {formatCurrency(bill.userAmount)}
                           </span>
                         </div>
                       </div>

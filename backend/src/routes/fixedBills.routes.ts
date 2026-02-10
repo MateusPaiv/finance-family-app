@@ -35,14 +35,19 @@ const sharedWithInclude = {
 };
 
 // Helper to serialize a fixed bill (convert Decimals to Numbers)
+// userAmount = total amount minus what others pay (the user's actual cost)
 function serializeBill(bill: any) {
+  const amount = Number(bill.amount);
+  const sharedWith = bill.sharedWith?.map((s: any) => ({
+    ...s,
+    splitAmount: Number(s.splitAmount),
+  }));
+  const othersTotal = sharedWith?.reduce((sum: number, s: any) => sum + s.splitAmount, 0) ?? 0;
   return {
     ...bill,
-    amount: Number(bill.amount),
-    sharedWith: bill.sharedWith?.map((s: any) => ({
-      ...s,
-      splitAmount: Number(s.splitAmount),
-    })),
+    amount,
+    userAmount: Math.round((amount - othersTotal) * 100) / 100,
+    sharedWith,
   };
 }
 
@@ -127,11 +132,13 @@ router.get(
 
       const bills = await prisma.fixedBill.findMany({
         where: { userId, recurrence: "MONTHLY" },
+        include: sharedWithInclude,
       });
 
-      const totalMonthly = bills.reduce((sum, b) => sum + Number(b.amount), 0);
-      const paid = bills.filter((b) => b.isPaid);
-      const unpaid = bills.filter((b) => !b.isPaid);
+      const serialized = bills.map(serializeBill);
+      const totalMonthly = serialized.reduce((sum, b) => sum + b.userAmount, 0);
+      const paid = serialized.filter((b) => b.isPaid);
+      const unpaid = serialized.filter((b) => !b.isPaid);
 
       res.json({
         status: "success",
@@ -140,10 +147,10 @@ router.get(
           paidCount: paid.length,
           unpaidCount: unpaid.length,
           totalPaid: Math.round(
-            paid.reduce((sum, b) => sum + Number(b.amount), 0) * 100,
+            paid.reduce((sum, b) => sum + b.userAmount, 0) * 100,
           ) / 100,
           totalUnpaid: Math.round(
-            unpaid.reduce((sum, b) => sum + Number(b.amount), 0) * 100,
+            unpaid.reduce((sum, b) => sum + b.userAmount, 0) * 100,
           ) / 100,
         },
       });

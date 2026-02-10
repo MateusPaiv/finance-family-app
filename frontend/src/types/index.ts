@@ -96,6 +96,7 @@ export interface Expense {
   id: string;
   userId: string;
   amount: number;
+  userAmount: number;
   description: string | null;
   date: string;
   categoryId: string | null;
@@ -159,6 +160,7 @@ export interface FixedBill {
   userId: string;
   name: string;
   amount: number;
+  userAmount: number;
   categoryId: string | null;
   dueDay: number;
   recurrence: Recurrence;
