@@ -1,4 +1,5 @@
-import { PrismaClient, PaymentMethodType, Recurrence } from '@prisma/client'
+/// <reference types="node" />
+import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
