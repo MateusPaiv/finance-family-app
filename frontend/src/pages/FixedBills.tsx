@@ -389,9 +389,16 @@ export function FixedBills() {
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <p className="text-sm font-semibold text-gray-900">
-                          {formatCurrency(bill.amount)}
-                        </p>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-gray-900">
+                            {formatCurrency(bill.userAmount)}
+                          </p>
+                          {bill.isShared && (
+                            <p className="text-xs text-gray-400 line-through">
+                              {formatCurrency(bill.amount)}
+                            </p>
+                          )}
+                        </div>
                         <Button
                           variant="primary"
                           size="sm"
@@ -436,9 +443,16 @@ export function FixedBills() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <p className="text-sm font-semibold text-gray-900">
-                      {formatCurrency(bill.amount)}
-                    </p>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {formatCurrency(bill.userAmount)}
+                      </p>
+                      {bill.isShared && (
+                        <p className="text-xs text-gray-400 line-through">
+                          {formatCurrency(bill.amount)}
+                        </p>
+                      )}
+                    </div>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -613,8 +627,13 @@ export function FixedBills() {
                     {/* Amount */}
                     <div className="text-right shrink-0">
                       <p className="text-lg font-semibold text-gray-900">
-                        {formatCurrency(bill.amount)}
+                        {formatCurrency(bill.userAmount)}
                       </p>
+                      {bill.isShared && (
+                        <p className="text-xs text-gray-400 line-through">
+                          {formatCurrency(bill.amount)}
+                        </p>
+                      )}
                       {bill.isPaid && bill.lastPaidAt && (
                         <p className="text-xs text-gray-500">
                           Paid {new Date(bill.lastPaidAt).toLocaleDateString('pt-BR')}
@@ -661,7 +680,7 @@ export function FixedBills() {
                 const bills = getBillsForDay(day);
                 const hasBills = bills.length > 0;
                 const hasUnpaid = bills.some((b) => !b.isPaid);
-                const totalAmount = bills.reduce((sum, b) => sum + b.amount, 0);
+                const totalAmount = bills.reduce((sum, b) => sum + b.userAmount, 0);
 
                 return (
                   <div
@@ -700,7 +719,7 @@ export function FixedBills() {
                             </div>
                             <div className="flex items-center justify-between">
                               <span className="text-gray-600">
-                                {formatCurrency(bill.amount)}
+                                {formatCurrency(bill.userAmount)}
                               </span>
                               {bill.isPaid ? (
                                 <CheckCircle2 size={12} className="text-success" />

@@ -69,6 +69,22 @@ const updateExpenseSchema = z.object({
     .transform((val) => val === "true"),
 });
 
+// Helper: compute userAmount = total - sum of others' splits
+function serializeExpense(e: any) {
+  const amount = Number(e.amount);
+  const sharedWith = e.sharedWith?.map((s: any) => ({
+    ...s,
+    splitAmount: Number(s.splitAmount),
+  }));
+  const othersTotal = sharedWith?.reduce((sum: number, s: any) => sum + s.splitAmount, 0) ?? 0;
+  return {
+    ...e,
+    amount,
+    userAmount: Math.round((amount - othersTotal) * 100) / 100,
+    sharedWith: sharedWith ?? [],
+  };
+}
+
 const querySchema = z.object({
   startDate: z.string().optional(),
   endDate: z.string().optional(),
@@ -129,15 +145,24 @@ router.get(
       const startOfMonth = new Date(year, month - 1, 1);
       const endOfMonth = new Date(year, month, 0, 23, 59, 59);
 
-      const expenses = await prisma.expense.findMany({
+      const rawExpenses = await prisma.expense.findMany({
         where: {
           userId,
           date: { gte: startOfMonth, lte: endOfMonth },
         },
-        include: { category: true, paymentMethod: true },
+        include: {
+          category: true,
+          paymentMethod: true,
+          sharedWith: {
+            include: {
+              sharedWith: { select: { id: true, name: true, email: true } },
+            },
+          },
+        },
       });
 
-      const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+      const expenses = rawExpenses.map(serializeExpense);
+      const totalSpent = expenses.reduce((sum, e) => sum + e.userAmount, 0);
 
       // Group by category
       const byCategory: Record<string, { name: string; emoji: string; total: number; count: number }> = {};
@@ -151,7 +176,7 @@ router.get(
             count: 0,
           };
         }
-        byCategory[key].total += Number(exp.amount);
+        byCategory[key].total += exp.userAmount;
         byCategory[key].count++;
       }
 
@@ -167,7 +192,7 @@ router.get(
             count: 0,
           };
         }
-        byPaymentMethod[key].total += Number(exp.amount);
+        byPaymentMethod[key].total += exp.userAmount;
         byPaymentMethod[key].count++;
       }
 
@@ -225,14 +250,7 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
       prisma.expense.count({ where }),
     ]);
 
-    const data = expenses.map((e) => ({
-      ...e,
-      amount: Number(e.amount),
-      sharedWith: e.sharedWith.map((s) => ({
-        ...s,
-        splitAmount: Number(s.splitAmount),
-      })),
-    }));
+    const data = expenses.map(serializeExpense);
 
     res.json({
       status: "success",
@@ -276,14 +294,7 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
 
     res.json({
       status: "success",
-      data: {
-        ...expense,
-        amount: Number(expense.amount),
-        sharedWith: expense.sharedWith.map((s) => ({
-          ...s,
-          splitAmount: Number(s.splitAmount),
-        })),
-      },
+      data: serializeExpense(expense),
     });
   } catch (error) {
     next(error);
@@ -343,16 +354,7 @@ router.post(
 
       res.status(201).json({
         status: "success",
-        data: expense
-          ? {
-              ...expense,
-              amount: Number(expense.amount),
-              sharedWith: expense.sharedWith.map((s) => ({
-                ...s,
-                splitAmount: Number(s.splitAmount),
-              })),
-            }
-          : null,
+        data: expense ? serializeExpense(expense) : null,
       });
     } catch (error) {
       next(error);
@@ -397,14 +399,7 @@ router.put(
 
       res.json({
         status: "success",
-        data: {
-          ...expense,
-          amount: Number(expense.amount),
-          sharedWith: expense.sharedWith.map((s) => ({
-            ...s,
-            splitAmount: Number(s.splitAmount),
-          })),
-        },
+        data: serializeExpense(expense),
       });
     } catch (error) {
       next(error);

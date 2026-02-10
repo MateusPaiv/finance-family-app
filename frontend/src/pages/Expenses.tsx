@@ -225,7 +225,7 @@ export function Expenses() {
     if (sortBy === 'date') {
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     }
-    return b.amount - a.amount;
+    return b.userAmount - a.userAmount;
   });
 
   const categoryOptions =
