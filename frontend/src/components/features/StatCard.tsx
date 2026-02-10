@@ -11,11 +11,12 @@ export interface StatCardProps {
     value: number;
     direction: 'up' | 'down';
   };
+  formatAsCurrency?: boolean;
   className?: string;
 }
 
-export function StatCard({ label, value, icon, trend, className }: StatCardProps) {
-  const displayValue = typeof value === 'number'
+export function StatCard({ label, value, icon, trend, formatAsCurrency = true, className }: StatCardProps) {
+  const displayValue = typeof value === 'number' && formatAsCurrency
     ? new Intl.NumberFormat('pt-BR', {
         style: 'currency',
         currency: 'BRL',
