@@ -31,6 +31,13 @@ export function useFixedBillsSummary() {
   });
 }
 
+export function useSharedFixedBills() {
+  return useQuery({
+    queryKey: ['fixed-bills', 'shared'],
+    queryFn: () => fixedBillsService.getSharedFixedBills(),
+  });
+}
+
 export function useCreateFixedBill() {
   const queryClient = useQueryClient();
 

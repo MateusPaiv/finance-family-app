@@ -13,6 +13,7 @@ import {
   AlertCircle,
   DollarSign,
   TrendingUp,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -28,9 +29,11 @@ import {
   useUpdateFixedBill,
   useDeleteFixedBill,
   usePayFixedBill,
+  useSharedFixedBills,
 } from '@/hooks/useFixedBills';
 import { useCategories } from '@/hooks/useCategories';
-import type { FixedBill, Recurrence } from '@/types';
+import * as authService from '@/services/auth';
+import type { FixedBill, Recurrence, User } from '@/types';
 import { cn } from '@/lib/utils';
 
 const fixedBillSchema = z.object({
@@ -57,9 +60,16 @@ export function FixedBills() {
   const [editingBill, setEditingBill] = useState<FixedBill | null>(null);
   const [deletingBillId, setDeletingBillId] = useState<string | null>(null);
 
+  // Sharing state
+  const [isShared, setIsShared] = useState(false);
+  const [familyMembers, setFamilyMembers] = useState<User[]>([]);
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [splitAmounts, setSplitAmounts] = useState<Record<string, number>>({});
+
   const { data: fixedBills } = useFixedBills();
   const { data: summary } = useFixedBillsSummary();
   const { data: categories } = useCategories();
+  const { data: sharedWithMe } = useSharedFixedBills();
   const createBill = useCreateFixedBill();
   const updateBill = useUpdateFixedBill();
   const deleteBill = useDeleteFixedBill();
@@ -82,6 +92,7 @@ export function FixedBills() {
 
   const formRecurrence = watch('recurrence');
   const formCategoryId = watch('categoryId');
+  const formAmount = watch('amount');
 
   // Calculate days until due
   const getDaysUntilDue = (dueDay: number) => {
@@ -125,6 +136,40 @@ export function FixedBills() {
   // Get next bill due
   const nextBill = upcomingBills.length > 0 ? upcomingBills[0] : null;
 
+  // Load family members when sharing is enabled
+  const loadFamilyMembers = async () => {
+    if (familyMembers.length === 0) {
+      const members = await authService.getFamilyMembers();
+      setFamilyMembers(members);
+    }
+  };
+
+  const handleShareToggle = async () => {
+    const newValue = !isShared;
+    setIsShared(newValue);
+    if (newValue) {
+      await loadFamilyMembers();
+    }
+  };
+
+  const handleMemberToggle = (memberId: string) => {
+    setSelectedMembers((prev) =>
+      prev.includes(memberId)
+        ? prev.filter((id) => id !== memberId)
+        : [...prev, memberId]
+    );
+  };
+
+  const handleEqualSplit = () => {
+    if (!formAmount || selectedMembers.length === 0) return;
+    const splitAmount = formAmount / (selectedMembers.length + 1);
+    const newSplits: Record<string, number> = {};
+    selectedMembers.forEach((id) => {
+      newSplits[id] = Math.round(splitAmount * 100) / 100;
+    });
+    setSplitAmounts(newSplits);
+  };
+
   const handleOpenAdd = () => {
     reset({
       name: '',
@@ -133,10 +178,13 @@ export function FixedBills() {
       dueDay: 1,
       recurrence: 'MONTHLY',
     });
+    setIsShared(false);
+    setSelectedMembers([]);
+    setSplitAmounts({});
     setIsAddModalOpen(true);
   };
 
-  const handleOpenEdit = (bill: FixedBill) => {
+  const handleOpenEdit = async (bill: FixedBill) => {
     reset({
       name: bill.name,
       amount: bill.amount,
@@ -144,6 +192,19 @@ export function FixedBills() {
       dueDay: bill.dueDay,
       recurrence: bill.recurrence,
     });
+    setIsShared(bill.isShared);
+    if (bill.isShared && bill.sharedWith && bill.sharedWith.length > 0) {
+      await loadFamilyMembers();
+      setSelectedMembers(bill.sharedWith.map((s) => s.sharedWithId));
+      const splits: Record<string, number> = {};
+      bill.sharedWith.forEach((s) => {
+        splits[s.sharedWithId] = s.splitAmount;
+      });
+      setSplitAmounts(splits);
+    } else {
+      setSelectedMembers([]);
+      setSplitAmounts({});
+    }
     setEditingBill(bill);
   };
 
@@ -151,13 +212,25 @@ export function FixedBills() {
     setIsAddModalOpen(false);
     setEditingBill(null);
     reset();
+    setIsShared(false);
+    setSelectedMembers([]);
+    setSplitAmounts({});
   };
 
   const onSubmit = async (data: FixedBillFormData) => {
     try {
+      const sharedWith = isShared
+        ? selectedMembers.map((userId) => ({
+            userId,
+            splitAmount: splitAmounts[userId] || 0,
+          }))
+        : undefined;
+
       const payload = {
         ...data,
         categoryId: data.categoryId || undefined,
+        isShared,
+        sharedWith,
       };
 
       if (editingBill) {
@@ -381,6 +454,51 @@ export function FixedBills() {
           </Card>
         )}
 
+        {/* Shared With Me */}
+        {sharedWithMe && sharedWithMe.length > 0 && (
+          <Card padding="md" className="mb-6">
+            <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Users size={18} />
+              Shared with me ({sharedWithMe.length})
+            </h3>
+            <div className="space-y-2">
+              {sharedWithMe.map((shared) => (
+                <div
+                  key={shared.id}
+                  className="flex items-center justify-between p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    {shared.fixedBill?.category && (
+                      <span className="text-xl">{shared.fixedBill.category.emoji}</span>
+                    )}
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {shared.fixedBill?.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        From {shared.createdBy?.name} · Due day {shared.fixedBill?.dueDay}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {formatCurrency(shared.splitAmount)}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        of {formatCurrency(shared.fixedBill?.amount || 0)}
+                      </p>
+                    </div>
+                    <Badge color={shared.isPaid ? 'success' : 'warning'} size="sm">
+                      {shared.isPaid ? 'Paid' : 'Unpaid'}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
         {/* Main Content */}
         {!fixedBills || fixedBills.length === 0 ? (
           <Card padding="lg" className="text-center py-12">
@@ -452,6 +570,12 @@ export function FixedBills() {
                         {isDueSoon && !bill.isPaid && (
                           <Badge color="warning" size="sm">Due Soon</Badge>
                         )}
+                        {bill.isShared && (
+                          <Badge color="accent" size="sm">
+                            <Users size={10} className="mr-1" />
+                            Shared
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
                         <span>Due: Day {bill.dueDay}</span>
@@ -472,6 +596,14 @@ export function FixedBills() {
                               'text-gray-500'
                             )}>
                               {isOverdue ? 'Overdue' : `In ${daysUntil} days`}
+                            </span>
+                          </>
+                        )}
+                        {bill.isShared && bill.sharedWith && bill.sharedWith.length > 0 && (
+                          <>
+                            <span>•</span>
+                            <span className="text-accent">
+                              with {bill.sharedWith.map((s) => s.sharedWith?.name).filter(Boolean).join(', ')}
                             </span>
                           </>
                         )}
@@ -676,6 +808,72 @@ export function FixedBills() {
               value={formRecurrence}
               onChange={(value) => setValue('recurrence', value as Recurrence)}
             />
+          </div>
+
+          {/* Share with family */}
+          <div className="space-y-3 pt-4 border-t border-gray-200">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isShared}
+                onChange={handleShareToggle}
+                className="w-4 h-4 rounded border-gray-300 text-accent focus:ring-accent"
+              />
+              <span className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                <Users size={16} />
+                Share with family
+              </span>
+            </label>
+
+            {isShared && (
+              <div className="pl-6 space-y-3">
+                <div className="space-y-2">
+                  {familyMembers.map((member) => (
+                    <label
+                      key={member.id}
+                      className="flex items-center justify-between p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedMembers.includes(member.id)}
+                          onChange={() => handleMemberToggle(member.id)}
+                          className="w-4 h-4 rounded border-gray-300 text-accent focus:ring-accent"
+                        />
+                        <span className="text-sm text-gray-900">{member.name}</span>
+                      </div>
+                      {selectedMembers.includes(member.id) && (
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={splitAmounts[member.id] || ''}
+                          onChange={(e) =>
+                            setSplitAmounts((prev) => ({
+                              ...prev,
+                              [member.id]: parseFloat(e.target.value) || 0,
+                            }))
+                          }
+                          className="w-24 h-8 px-2 text-sm border border-gray-200 rounded"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      )}
+                    </label>
+                  ))}
+                </div>
+
+                {selectedMembers.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleEqualSplit}
+                  >
+                    Split equally
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
 
           {editingBill?.isPaid && (

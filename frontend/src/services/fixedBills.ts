@@ -4,6 +4,7 @@ import type {
   CreateFixedBillRequest,
   FixedBill,
   FixedBillSummary,
+  SharedFixedBill,
   UpdateFixedBillRequest,
 } from '@/types';
 
@@ -55,6 +56,13 @@ export async function payFixedBill(id: string): Promise<FixedBill> {
 export async function resetFixedBill(id: string): Promise<FixedBill> {
   const { data } = await api.post<ApiResponse<FixedBill>>(
     `/api/fixed-bills/${id}/reset`,
+  );
+  return data.data!;
+}
+
+export async function getSharedFixedBills(): Promise<SharedFixedBill[]> {
+  const { data } = await api.get<ApiResponse<SharedFixedBill[]>>(
+    '/api/fixed-bills/shared/with-me',
   );
   return data.data!;
 }
