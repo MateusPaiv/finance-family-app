@@ -345,11 +345,13 @@ export function FixedBills() {
               label="Paid"
               value={summary?.paidCount || 0}
               icon={<CheckCircle2 size={20} />}
+              formatAsCurrency={false}
             />
             <StatCard
               label="Unpaid"
               value={summary?.unpaidCount || 0}
-              icon={<Circle size={20} />}
+              icon={<Circle size={20} />} 
+              formatAsCurrency={false}
             />
             <StatCard
               label="Next Due"

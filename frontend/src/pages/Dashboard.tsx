@@ -156,7 +156,7 @@ export function Dashboard() {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Expenses</p>
-                  <p className="text-sm font-semibold text-red-600">{formatCurrency(totalSpent)}</p>
+                  <p className="text-sm font-semibold text-red-600">{totalSpent}</p>
                 </div>
               </div>
             </div>
