@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
-import rateLimit from "express-rate-limit";
+// import rateLimit from "express-rate-limit"; // Disabled
 import path from "path";
 import { fileURLToPath } from "url";
 import { env } from "./config/env.js";
@@ -24,15 +24,17 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
 
 // ─── Rate limiting ───────────────────────────────────────────────────────────
+// DISABLED: Rate limiting disabled for easier development and configuration
+// Uncomment below to re-enable rate limiting in production if needed
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: env.NODE_ENV === "production" ? 100 : 1000, // Higher limit for development
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { status: "error", message: "Too many requests, please try again later" },
-});
-app.use("/api", limiter);
+// const limiter = rateLimit({
+//   windowMs: 15 * 60 * 1000, // 15 minutes
+//   max: env.NODE_ENV === "production" ? 100 : 1000, // Higher limit for development
+//   standardHeaders: true,
+//   legacyHeaders: false,
+//   message: { status: "error", message: "Too many requests, please try again later" },
+// });
+// app.use("/api", limiter);
 
 // ─── Body parsing & compression ──────────────────────────────────────────────
 
