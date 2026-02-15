@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState } from "react";
 import {
   DollarSign,
   TrendingUp,
@@ -6,20 +6,24 @@ import {
   Calendar,
   CreditCard,
   AlertCircle,
-} from 'lucide-react';
-import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
-import { StatCard } from '@/components/features/StatCard';
-import { ExpenseCard } from '@/components/features/ExpenseCard';
-import { BudgetBar } from '@/components/features/BudgetBar';
-import { MonthSelector } from '@/components/features/MonthSelector';
-import { useAuth } from '@/hooks/useAuth';
-import { useExpenses, useMonthlySummary } from '@/hooks/useExpenses';
-import { useFixedBills, useFixedBillsSummary, usePayFixedBill } from '@/hooks/useFixedBills';
-import { useBudgetOverview } from '@/hooks/useCategories';
-import { useIncomeSummary } from '@/hooks/useIncomes';
-import { cn } from '@/lib/utils';
+} from "lucide-react";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { StatCard } from "@/components/features/StatCard";
+import { ExpenseCard } from "@/components/features/ExpenseCard";
+import { BudgetBar } from "@/components/features/BudgetBar";
+import { MonthSelector } from "@/components/features/MonthSelector";
+import { useAuth } from "@/hooks/useAuth";
+import { useExpenses, useMonthlySummary } from "@/hooks/useExpenses";
+import {
+  useFixedBills,
+  useFixedBillsSummary,
+  usePayFixedBill,
+} from "@/hooks/useFixedBills";
+import { useBudgetOverview } from "@/hooks/useCategories";
+import { useIncomeSummary } from "@/hooks/useIncomes";
+import { cn } from "@/lib/utils";
 
 export function Dashboard() {
   const { user } = useAuth();
@@ -43,21 +47,29 @@ export function Dashboard() {
   const totalSpent = summary?.totalSpent || 0;
   const fixedBillsTotal = fixedBillsSummary?.totalMonthly || 0;
   const availableToSpend = totalIncome - totalSpent - fixedBillsTotal;
-  const spendingPercentage = totalIncome > 0 ? ((totalSpent + fixedBillsTotal) / totalIncome) * 100 : 0;
+  const spendingPercentage =
+    totalIncome > 0 ? ((totalSpent + fixedBillsTotal) / totalIncome) * 100 : 0;
 
   const getSpendingColor = () => {
-    if (spendingPercentage >= 90) return { bg: 'bg-error-light', text: 'text-error', bar: 'bg-error' };
-    if (spendingPercentage >= 70) return { bg: 'bg-warning-light', text: 'text-warning', bar: 'bg-warning' };
-    return { bg: 'bg-success-light', text: 'text-success', bar: 'bg-success' };
+    if (spendingPercentage >= 90)
+      return { bg: "bg-error-light", text: "text-error", bar: "bg-error" };
+    if (spendingPercentage >= 70)
+      return {
+        bg: "bg-warning-light",
+        text: "text-warning",
+        bar: "bg-warning",
+      };
+    return { bg: "bg-success-light", text: "text-success", bar: "bg-success" };
   };
 
   const colors = getSpendingColor();
 
   // Upcoming bills (next 5 unpaid)
-  const upcomingBills = fixedBills
-    ?.filter((bill) => !bill.isPaid)
-    .sort((a, b) => a.dueDay - b.dueDay)
-    .slice(0, 5) || [];
+  const upcomingBills =
+    fixedBills
+      ?.filter((bill) => !bill.isPaid)
+      .sort((a, b) => a.dueDay - b.dueDay)
+      .slice(0, 5) || [];
 
   // Recent expenses
   const recentExpenses = expensesData?.data?.slice(0, 10) || [];
@@ -66,13 +78,16 @@ export function Dashboard() {
   const paymentMethodSpending = summary?.byPaymentMethod || [];
 
   const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount);
+    new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(amount);
 
   const handlePayBill = async (billId: string) => {
     try {
       await payBill.mutateAsync(billId);
     } catch (error) {
-      console.error('Failed to mark bill as paid:', error);
+      console.error("Failed to mark bill as paid:", error);
     }
   };
 
@@ -84,13 +99,16 @@ export function Dashboard() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">
-                Welcome back, {user?.name?.split(' ')[0]}
+                Welcome back, {user?.name?.split(" ")[0]}
               </h1>
               <p className="text-sm text-gray-500 mt-1">
                 Here's your financial overview
               </p>
             </div>
-            <MonthSelector selectedDate={selectedDate} onChange={setSelectedDate} />
+            <MonthSelector
+              selectedDate={selectedDate}
+              onChange={setSelectedDate}
+            />
           </div>
         </div>
       </div>
@@ -109,7 +127,7 @@ export function Dashboard() {
                   Income - Fixed Bills - Expenses
                 </p>
               </div>
-              <div className={cn('p-2 rounded-lg', colors.bg)}>
+              <div className={cn("p-2 rounded-lg", colors.bg)}>
                 <DollarSign size={20} className={colors.text} />
               </div>
             </div>
@@ -130,15 +148,19 @@ export function Dashboard() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">
-                    {formatCurrency(totalSpent + fixedBillsTotal)} of {formatCurrency(totalIncome)}
+                    {formatCurrency(totalSpent + fixedBillsTotal)} of{" "}
+                    {formatCurrency(totalIncome)}
                   </span>
-                  <span className={cn('font-medium', colors.text)}>
+                  <span className={cn("font-medium", colors.text)}>
                     {spendingPercentage.toFixed(0)}%
                   </span>
                 </div>
                 <div className="relative h-3 bg-gray-100 rounded-full overflow-hidden">
                   <div
-                    className={cn('absolute inset-y-0 left-0 rounded-full transition-all', colors.bar)}
+                    className={cn(
+                      "absolute inset-y-0 left-0 rounded-full transition-all",
+                      colors.bar,
+                    )}
                     style={{ width: `${Math.min(spendingPercentage, 100)}%` }}
                   />
                 </div>
@@ -148,15 +170,21 @@ export function Dashboard() {
               <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-200">
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Monthly Income</p>
-                  <p className="text-sm font-semibold text-green-600">{formatCurrency(totalIncome)}</p>
+                  <p className="text-sm font-semibold text-green-600">
+                    {formatCurrency(totalIncome)}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Fixed Bills</p>
-                  <p className="text-sm font-semibold text-orange-600">{formatCurrency(fixedBillsTotal)}</p>
+                  <p className="text-sm font-semibold text-orange-600">
+                    {formatCurrency(fixedBillsTotal)}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Expenses</p>
-                  <p className="text-sm font-semibold text-red-600">{totalSpent}</p>
+                  <p className="text-sm font-semibold text-red-600">
+                    {formatCurrency(totalSpent)}
+                  </p>
                 </div>
               </div>
             </div>
@@ -176,7 +204,9 @@ export function Dashboard() {
             />
             <StatCard
               label="Average"
-              value={summary?.expenseCount ? totalSpent / summary.expenseCount : 0}
+              value={
+                summary?.expenseCount ? totalSpent / summary.expenseCount : 0
+              }
               icon={<Calendar size={20} />}
             />
           </div>
@@ -184,7 +214,9 @@ export function Dashboard() {
           {/* 2. Credit Cards Preview */}
           <Card padding="md" className="lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Payment Methods</h2>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Payment Methods
+              </h2>
               <CreditCard size={20} className="text-gray-400" />
             </div>
 
@@ -202,8 +234,12 @@ export function Dashboard() {
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">{pm.icon}</span>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{pm.name}</p>
-                        <p className="text-xs text-gray-500">{pm.count} transactions</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {pm.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {pm.count} transactions
+                        </p>
                       </div>
                     </div>
                     <p className="text-base font-semibold text-gray-900">
@@ -218,7 +254,9 @@ export function Dashboard() {
           {/* 3. Upcoming Fixed Bills */}
           <Card padding="md">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Upcoming Bills</h2>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Upcoming Bills
+              </h2>
               <Badge color="default">{upcomingBills.length}</Badge>
             </div>
 
@@ -244,13 +282,22 @@ export function Dashboard() {
                             {bill.name}
                           </p>
                           {isOverdue && (
-                            <AlertCircle size={14} className="text-error shrink-0" />
+                            <AlertCircle
+                              size={14}
+                              className="text-error shrink-0"
+                            />
                           )}
                         </div>
                         <div className="flex items-center gap-2 text-xs">
-                          <span className={cn(
-                            isOverdue ? 'text-error' : isDueSoon ? 'text-warning' : 'text-gray-500'
-                          )}>
+                          <span
+                            className={cn(
+                              isOverdue
+                                ? "text-error"
+                                : isDueSoon
+                                  ? "text-warning"
+                                  : "text-gray-500",
+                            )}
+                          >
                             Due: Day {bill.dueDay}
                           </span>
                           <span className="text-gray-400">•</span>
@@ -276,11 +323,14 @@ export function Dashboard() {
 
           {/* 5. Budget Overview */}
           <Card padding="md" className="lg:col-span-3">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Budget Overview</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              Budget Overview
+            </h2>
 
             {!budgetOverview || budgetOverview.length === 0 ? (
               <p className="text-sm text-gray-500 py-8 text-center">
-                No budgets set. Create categories with budget limits to track spending.
+                No budgets set. Create categories with budget limits to track
+                spending.
               </p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -288,18 +338,27 @@ export function Dashboard() {
                   <div
                     key={cat.id}
                     className={cn(
-                      'p-4 rounded-lg border',
-                      cat.isOverBudget ? 'border-error/20 bg-error-light/30' : 'border-gray-200'
+                      "p-4 rounded-lg border",
+                      cat.isOverBudget
+                        ? "border-error/20 bg-error-light/30"
+                        : "border-gray-200",
                     )}
                   >
                     <div className="flex items-center gap-2 mb-3">
                       <span className="text-xl">{cat.emoji}</span>
-                      <span className="text-sm font-medium text-gray-900">{cat.name}</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {cat.name}
+                      </span>
                       {cat.isOverBudget && (
-                        <Badge color="error" size="sm">Over</Badge>
+                        <Badge color="error" size="sm">
+                          Over
+                        </Badge>
                       )}
                     </div>
-                    <BudgetBar spent={cat.totalSpent} budget={cat.budgetLimit} />
+                    <BudgetBar
+                      spent={cat.totalSpent}
+                      budget={cat.budgetLimit}
+                    />
                   </div>
                 ))}
               </div>
@@ -309,8 +368,12 @@ export function Dashboard() {
           {/* 4. Recent Expenses */}
           <Card padding="md" className="lg:col-span-3">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Recent Expenses</h2>
-              <Button variant="ghost" size="sm">View All</Button>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Recent Expenses
+              </h2>
+              <Button variant="ghost" size="sm">
+                View All
+              </Button>
             </div>
 
             {recentExpenses.length === 0 ? (
