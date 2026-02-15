@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { format, parseISO } from 'date-fns';
 import {
   User,
   Key,
@@ -145,7 +146,7 @@ export function Settings() {
       'Is Shared',
     ];
     const rows = (expensesData?.data || []).map((exp) => [
-      new Date(exp.date).toISOString().split('T')[0],
+      format(parseISO(exp.date), 'yyyy-MM-dd'),
       exp.description || '',
       exp.amount.toString(),
       exp.category?.name || '',

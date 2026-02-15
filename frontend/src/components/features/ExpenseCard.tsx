@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { Edit2, FileText, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -15,7 +15,8 @@ export function ExpenseCard({ expense, onEdit, onDelete }: ExpenseCardProps) {
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
   const formattedAmount = fmt(expense.userAmount);
 
-  const formattedDate = format(new Date(expense.date), 'dd/MM/yyyy');
+  // Use parseISO to avoid timezone conversion issues
+  const formattedDate = format(parseISO(expense.date), 'dd/MM/yyyy');
 
   return (
     <Card

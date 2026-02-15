@@ -32,7 +32,7 @@ import { StatCard } from '@/components/features/StatCard';
 import { MonthSelector } from '@/components/features/MonthSelector';
 import { useExpenses } from '@/hooks/useExpenses';
 import { useBudgetOverview } from '@/hooks/useCategories';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, subMonths, parseISO } from 'date-fns';
 
 // Color palette for charts
 const COLORS = [
@@ -64,7 +64,7 @@ export function Reports() {
   // Filter expenses by date range
   const filteredExpenses = useMemo(() => {
     return expenses.filter((exp) => {
-      const expDate = new Date(exp.date);
+      const expDate = parseISO(exp.date);
       return expDate >= dateRange.start && expDate <= dateRange.end;
     });
   }, [expenses, dateRange]);
@@ -114,7 +114,7 @@ export function Reports() {
     previousEnd.setDate(previousEnd.getDate() - periodLength);
 
     const previousExpenses = expenses.filter((exp) => {
-      const expDate = new Date(exp.date);
+      const expDate = parseISO(exp.date);
       return expDate >= previousStart && expDate < dateRange.start;
     });
     const previousTotal = previousExpenses.reduce((sum, exp) => sum + exp.userAmount, 0);
@@ -160,7 +160,7 @@ export function Reports() {
       const monthEnd = endOfMonth(date);
 
       const monthExpenses = expenses.filter((exp) => {
-        const expDate = new Date(exp.date);
+        const expDate = parseISO(exp.date);
         return expDate >= monthStart && expDate <= monthEnd;
       });
 
@@ -209,7 +209,7 @@ export function Reports() {
     const days = eachDayOfInterval({ start: dateRange.start, end: dateRange.end });
     return days.map((day) => {
       const dayExpenses = filteredExpenses.filter((exp) => {
-        const expDate = new Date(exp.date);
+        const expDate = parseISO(exp.date);
         return (
           expDate.getDate() === day.getDate() &&
           expDate.getMonth() === day.getMonth() &&
@@ -231,7 +231,7 @@ export function Reports() {
   const handleExportCSV = () => {
     const headers = ['Date', 'Description', 'Amount', 'Category', 'Payment Method'];
     const rows = filteredExpenses.map((exp) => [
-      format(new Date(exp.date), 'dd/MM/yyyy'),
+      format(parseISO(exp.date), 'dd/MM/yyyy'),
       exp.description || '',
       exp.amount.toString(),
       exp.category?.name || '',

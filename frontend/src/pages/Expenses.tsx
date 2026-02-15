@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { parseISO } from "date-fns";
 import {
   Plus,
   Search,
@@ -10,27 +11,29 @@ import {
   Upload,
   Trash2,
   Users,
-} from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
-import { Modal } from '@/components/ui/Modal';
-import { Card } from '@/components/ui/Card';
-import { ExpenseCard } from '@/components/features/ExpenseCard';
-import { MonthSelector } from '@/components/features/MonthSelector';
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Modal } from "@/components/ui/Modal";
+import { Card } from "@/components/ui/Card";
+import { ExpenseCard } from "@/components/features/ExpenseCard";
+import { MonthSelector } from "@/components/features/MonthSelector";
 import {
   useExpenses,
   useCreateExpense,
   useUpdateExpense,
   useDeleteExpense,
-} from '@/hooks/useExpenses';
-import { useCategories } from '@/hooks/useCategories';
-import { usePaymentMethods } from '@/hooks/usePaymentMethods';
-import * as authService from '@/services/auth';
-import type { Expense, User } from '@/types';
+} from "@/hooks/useExpenses";
+import { useCategories } from "@/hooks/useCategories";
+import { usePaymentMethods } from "@/hooks/usePaymentMethods";
+import * as authService from "@/services/auth";
+import type { Expense, User } from "@/types";
 
 const expenseSchema = z.object({
-  amount: z.number().positive('Amount must be positive'),
+  amount: z.number().positive("Amount must be positive"),
   description: z.string().optional(),
   date: z.string(),
   categoryId: z.string().optional(),
@@ -42,15 +45,18 @@ type ExpenseFormData = z.infer<typeof expenseSchema>;
 
 export function Expenses() {
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
-  const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
-  const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState("");
+  const [sortBy, setSortBy] = useState<"date" | "amount">("date");
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
+  const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(
+    null,
+  );
   const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
 
   // Receipt & sharing
@@ -66,14 +72,20 @@ export function Expenses() {
 
   const year = selectedDate.getFullYear();
   const month = selectedDate.getMonth() + 1;
-  const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-  const endDate = new Date(year, month, 0).toISOString().split('T')[0];
+  const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+  const endDate = new Date(year, month, 0).toISOString().split("T")[0];
+
+  // Pagination settings
+  const ITEMS_PER_PAGE = 10;
+  const offset = (currentPage - 1) * ITEMS_PER_PAGE;
 
   const { data: expensesData, isLoading } = useExpenses({
     startDate,
     endDate,
     categoryId: categoryFilter || undefined,
     paymentMethodId: paymentMethodFilter || undefined,
+    limit: ITEMS_PER_PAGE,
+    offset,
   });
 
   const createExpense = useCreateExpense();
@@ -90,14 +102,19 @@ export function Expenses() {
   } = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
     defaultValues: {
-      date: new Date().toISOString().split('T')[0],
+      date: new Date().toISOString().split("T")[0],
       isShared: false,
     },
   });
 
-  const formCategoryId = watch('categoryId');
-  const formPaymentMethodId = watch('paymentMethodId');
-  const formAmount = watch('amount');
+  const formCategoryId = watch("categoryId");
+  const formPaymentMethodId = watch("paymentMethodId");
+  const formAmount = watch("amount");
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedDate, categoryFilter, paymentMethodFilter, searchQuery]);
 
   // Load family members when sharing is enabled
   const loadFamilyMembers = async () => {
@@ -109,7 +126,7 @@ export function Expenses() {
 
   const handleOpenAdd = () => {
     reset({
-      date: new Date().toISOString().split('T')[0],
+      date: new Date().toISOString().split("T")[0],
       isShared: false,
     });
     setReceipt(null);
@@ -122,8 +139,8 @@ export function Expenses() {
   const handleOpenEdit = (expense: Expense) => {
     reset({
       amount: expense.amount,
-      description: expense.description || '',
-      date: expense.date.split('T')[0],
+      description: expense.description || "",
+      date: expense.date.split("T")[0],
       categoryId: expense.categoryId || undefined,
       paymentMethodId: expense.paymentMethodId || undefined,
       isShared: expense.isShared,
@@ -166,7 +183,7 @@ export function Expenses() {
       }
       handleCloseModal();
     } catch (error) {
-      console.error('Failed to save expense:', error);
+      console.error("Failed to save expense:", error);
     }
   };
 
@@ -176,7 +193,7 @@ export function Expenses() {
       await deleteExpense.mutateAsync(deletingExpenseId);
       setDeletingExpenseId(null);
     } catch (error) {
-      console.error('Failed to delete expense:', error);
+      console.error("Failed to delete expense:", error);
     }
   };
 
@@ -188,7 +205,7 @@ export function Expenses() {
   const handleShareToggle = async () => {
     const newValue = !isShared;
     setIsShared(newValue);
-    setValue('isShared', newValue);
+    setValue("isShared", newValue);
     if (newValue) {
       await loadFamilyMembers();
     }
@@ -198,7 +215,7 @@ export function Expenses() {
     setSelectedMembers((prev) =>
       prev.includes(memberId)
         ? prev.filter((id) => id !== memberId)
-        : [...prev, memberId]
+        : [...prev, memberId],
     );
   };
 
@@ -212,21 +229,27 @@ export function Expenses() {
     setSplitAmounts(newSplits);
   };
 
-  // Filter and sort expenses
+  // Filter and sort expenses (server already handles date/category/paymentMethod filters)
   let expenses = expensesData?.data || [];
 
+  // Client-side search filter
   if (searchQuery) {
     expenses = expenses.filter((e) =>
-      e.description?.toLowerCase().includes(searchQuery.toLowerCase())
+      e.description?.toLowerCase().includes(searchQuery.toLowerCase()),
     );
   }
 
+  // Client-side sorting
   expenses = [...expenses].sort((a, b) => {
-    if (sortBy === 'date') {
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    if (sortBy === "date") {
+      return parseISO(b.date).getTime() - parseISO(a.date).getTime();
     }
     return b.userAmount - a.userAmount;
   });
+
+  // Pagination info
+  const totalExpenses = expensesData?.pagination?.total || 0;
+  const totalPages = expensesData?.pagination?.pages || 1;
 
   const categoryOptions =
     categories?.map((c) => ({
@@ -287,7 +310,7 @@ export function Expenses() {
 
               <Select
                 options={[
-                  { value: '', label: 'All Categories' },
+                  { value: "", label: "All Categories" },
                   ...categoryOptions,
                 ]}
                 value={categoryFilter}
@@ -297,7 +320,7 @@ export function Expenses() {
 
               <Select
                 options={[
-                  { value: '', label: 'All Methods' },
+                  { value: "", label: "All Methods" },
                   ...paymentMethodOptions,
                 ]}
                 value={paymentMethodFilter}
@@ -307,11 +330,11 @@ export function Expenses() {
 
               <Select
                 options={[
-                  { value: 'date', label: 'Sort by Date' },
-                  { value: 'amount', label: 'Sort by Amount' },
+                  { value: "date", label: "Sort by Date" },
+                  { value: "amount", label: "Sort by Amount" },
                 ]}
                 value={sortBy}
-                onChange={(v) => setSortBy(v as 'date' | 'amount')}
+                onChange={(v) => setSortBy(v as "date" | "amount")}
               />
             </div>
           </div>
@@ -332,24 +355,64 @@ export function Expenses() {
             </h3>
             <p className="text-sm text-gray-500 mb-6">
               {searchQuery || categoryFilter || paymentMethodFilter
-                ? 'Try adjusting your filters'
-                : 'Add your first expense to get started'}
+                ? "Try adjusting your filters"
+                : "Add your first expense to get started"}
             </p>
-            <Button variant="primary" icon={<Plus size={16} />} onClick={handleOpenAdd}>
+            <Button
+              variant="primary"
+              icon={<Plus size={16} />}
+              onClick={handleOpenAdd}
+            >
               Add Expense
             </Button>
           </Card>
         ) : (
-          <div className="space-y-3">
-            {expenses.map((expense) => (
-              <ExpenseCard
-                key={expense.id}
-                expense={expense}
-                onEdit={handleOpenEdit}
-                onDelete={(id) => setDeletingExpenseId(id)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="space-y-3">
+              {expenses.map((expense) => (
+                <ExpenseCard
+                  key={expense.id}
+                  expense={expense}
+                  onEdit={handleOpenEdit}
+                  onDelete={(id) => setDeletingExpenseId(id)}
+                />
+              ))}
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <Card padding="md" className="mt-6">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-600">
+                    Page {currentPage} of {totalPages}
+                    <span className="text-gray-400 ml-2">
+                      ({totalExpenses} total expenses)
+                    </span>
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={<ChevronLeft size={16} />}
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={<ChevronRight size={16} />}
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )}
+          </>
         )}
       </div>
 
@@ -357,7 +420,7 @@ export function Expenses() {
       <Modal
         open={isAddModalOpen || !!editingExpense}
         onClose={handleCloseModal}
-        title={editingExpense ? 'Edit Expense' : 'Add Expense'}
+        title={editingExpense ? "Edit Expense" : "Add Expense"}
         size="lg"
         footer={
           <>
@@ -369,7 +432,7 @@ export function Expenses() {
               onClick={handleSubmit(onSubmit)}
               loading={createExpense.isPending || updateExpense.isPending}
             >
-              {editingExpense ? 'Save Changes' : 'Add Expense'}
+              {editingExpense ? "Save Changes" : "Add Expense"}
             </Button>
           </>
         }
@@ -381,36 +444,36 @@ export function Expenses() {
             step="0.01"
             placeholder="0.00"
             error={errors.amount?.message}
-            {...register('amount', { valueAsNumber: true })}
+            {...register("amount", { valueAsNumber: true })}
           />
 
           <Input
             label="Description"
             placeholder="What did you buy?"
             error={errors.description?.message}
-            {...register('description')}
+            {...register("description")}
           />
 
           <Input
             label="Date"
             type="date"
             error={errors.date?.message}
-            {...register('date')}
+            {...register("date")}
           />
 
           <Select
             label="Category"
             options={categoryOptions}
-            value={formCategoryId || ''}
-            onChange={(value) => setValue('categoryId', value)}
+            value={formCategoryId || ""}
+            onChange={(value) => setValue("categoryId", value)}
             placeholder="Select category..."
           />
 
           <Select
             label="Payment Method"
             options={paymentMethodOptions}
-            value={formPaymentMethodId || ''}
-            onChange={(value) => setValue('paymentMethodId', value)}
+            value={formPaymentMethodId || ""}
+            onChange={(value) => setValue("paymentMethodId", value)}
             placeholder="Select payment method..."
           />
 
@@ -430,7 +493,7 @@ export function Expenses() {
                 <div className="flex items-center justify-center gap-2 h-10 px-4 border border-gray-200 rounded-md cursor-pointer hover:bg-gray-50 transition-colors">
                   <Upload size={16} className="text-gray-500" />
                   <span className="text-sm text-gray-600">
-                    {receipt ? receipt.name : 'Choose file'}
+                    {receipt ? receipt.name : "Choose file"}
                   </span>
                 </div>
               </label>
@@ -481,14 +544,16 @@ export function Expenses() {
                             onChange={() => handleMemberToggle(member.id)}
                             className="w-4 h-4 rounded border-gray-300 text-accent focus:ring-accent"
                           />
-                          <span className="text-sm text-gray-900">{member.name}</span>
+                          <span className="text-sm text-gray-900">
+                            {member.name}
+                          </span>
                         </div>
                         {selectedMembers.includes(member.id) && (
                           <input
                             type="number"
                             step="0.01"
                             placeholder="0.00"
-                            value={splitAmounts[member.id] || ''}
+                            value={splitAmounts[member.id] || ""}
                             onChange={(e) =>
                               setSplitAmounts((prev) => ({
                                 ...prev,
@@ -528,7 +593,10 @@ export function Expenses() {
         size="sm"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setDeletingExpenseId(null)}>
+            <Button
+              variant="secondary"
+              onClick={() => setDeletingExpenseId(null)}
+            >
               Cancel
             </Button>
             <Button
@@ -543,7 +611,8 @@ export function Expenses() {
         }
       >
         <p className="text-sm text-gray-600">
-          Are you sure you want to delete this expense? This action cannot be undone.
+          Are you sure you want to delete this expense? This action cannot be
+          undone.
         </p>
       </Modal>
 
