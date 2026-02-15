@@ -93,7 +93,12 @@ export function Dashboard() {
 
   const handlePayBill = async (billId: string) => {
     try {
-      await payBill.mutateAsync(billId);
+      const now = new Date();
+      await payBill.mutateAsync({
+        id: billId,
+        year: now.getFullYear(),
+        month: now.getMonth() + 1,
+      });
     } catch (error) {
       console.error("Failed to mark bill as paid:", error);
     }

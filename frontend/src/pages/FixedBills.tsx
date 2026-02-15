@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { format } from 'date-fns';
 import {
   Plus,
   Edit2,
@@ -22,6 +23,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { StatCard } from '@/components/features/StatCard';
+import { MonthSelector } from '@/components/features/MonthSelector';
 import {
   useFixedBills,
   useFixedBillsSummary,
@@ -42,6 +44,9 @@ const fixedBillSchema = z.object({
   categoryId: z.string().optional(),
   dueDay: z.number().min(1, 'Due day must be between 1 and 31').max(31, 'Due day must be between 1 and 31'),
   recurrence: z.enum(['MONTHLY', 'YEARLY']),
+  totalInstallments: z.number().int().positive().optional().or(z.literal(0).transform(() => undefined)),
+  startMonth: z.number().int().min(1).max(12).optional(),
+  startYear: z.number().int().min(2000).max(2100).optional(),
 });
 
 type FixedBillFormData = z.infer<typeof fixedBillSchema>;
@@ -56,9 +61,11 @@ const RECURRENCE_OPTIONS: { value: Recurrence; label: string }[] = [
 
 export function FixedBills() {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingBill, setEditingBill] = useState<FixedBill | null>(null);
   const [deletingBillId, setDeletingBillId] = useState<string | null>(null);
+  const [isInstallment, setIsInstallment] = useState(false);
 
   // Sharing state
   const [isShared, setIsShared] = useState(false);
@@ -66,8 +73,16 @@ export function FixedBills() {
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [splitAmounts, setSplitAmounts] = useState<Record<string, number>>({});
 
-  const { data: fixedBills } = useFixedBills();
-  const { data: summary } = useFixedBillsSummary();
+  // Derive year/month from selectedDate
+  const year = selectedDate.getFullYear();
+  const month = selectedDate.getMonth() + 1;
+
+  // Check if viewing current month
+  const now = new Date();
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
+
+  const { data: fixedBills } = useFixedBills(year, month);
+  const { data: summary } = useFixedBillsSummary(year, month);
   const { data: categories } = useCategories();
   const { data: sharedWithMe } = useSharedFixedBills();
   const createBill = useCreateFixedBill();
@@ -94,7 +109,7 @@ export function FixedBills() {
   const formCategoryId = watch('categoryId');
   const formAmount = watch('amount');
 
-  // Calculate days until due
+  // Calculate days until due (only meaningful for current month)
   const getDaysUntilDue = (dueDay: number) => {
     const today = new Date();
     const currentDay = today.getDate();
@@ -113,25 +128,29 @@ export function FixedBills() {
     return diffDays;
   };
 
-  // Get bills due in next 7 days
-  const upcomingBills = fixedBills
-    ?.filter((bill) => !bill.isPaid && bill.recurrence === 'MONTHLY')
-    .map((bill) => ({
-      ...bill,
-      daysUntil: getDaysUntilDue(bill.dueDay),
-    }))
-    .filter((bill) => bill.daysUntil <= 7)
-    .sort((a, b) => a.daysUntil - b.daysUntil) || [];
+  // Get bills due in next 7 days (only for current month view)
+  const upcomingBills = isCurrentMonth
+    ? fixedBills
+        ?.filter((bill) => !bill.isPaid && bill.recurrence === 'MONTHLY')
+        .map((bill) => ({
+          ...bill,
+          daysUntil: getDaysUntilDue(bill.dueDay),
+        }))
+        .filter((bill) => bill.daysUntil <= 7 && bill.daysUntil >= 0)
+        .sort((a, b) => a.daysUntil - b.daysUntil) || []
+    : [];
 
-  // Get overdue bills
-  const overdueBills = fixedBills
-    ?.filter((bill) => !bill.isPaid && bill.recurrence === 'MONTHLY')
-    .map((bill) => ({
-      ...bill,
-      daysUntil: getDaysUntilDue(bill.dueDay),
-    }))
-    .filter((bill) => bill.daysUntil < 0)
-    .sort((a, b) => a.dueDay - b.dueDay) || [];
+  // Get overdue bills (only for current month view)
+  const overdueBills = isCurrentMonth
+    ? fixedBills
+        ?.filter((bill) => !bill.isPaid && bill.recurrence === 'MONTHLY')
+        .map((bill) => ({
+          ...bill,
+          daysUntil: getDaysUntilDue(bill.dueDay),
+        }))
+        .filter((bill) => bill.daysUntil < 0)
+        .sort((a, b) => a.dueDay - b.dueDay) || []
+    : [];
 
   // Get next bill due
   const nextBill = upcomingBills.length > 0 ? upcomingBills[0] : null;
@@ -177,7 +196,11 @@ export function FixedBills() {
       categoryId: undefined,
       dueDay: 1,
       recurrence: 'MONTHLY',
+      totalInstallments: undefined,
+      startMonth: month,
+      startYear: year,
     });
+    setIsInstallment(false);
     setIsShared(false);
     setSelectedMembers([]);
     setSplitAmounts({});
@@ -191,7 +214,11 @@ export function FixedBills() {
       categoryId: bill.categoryId || undefined,
       dueDay: bill.dueDay,
       recurrence: bill.recurrence,
+      totalInstallments: bill.totalInstallments || undefined,
+      startMonth: bill.startMonth || undefined,
+      startYear: bill.startYear || undefined,
     });
+    setIsInstallment(!!bill.totalInstallments);
     setIsShared(bill.isShared);
     if (bill.isShared && bill.sharedWith && bill.sharedWith.length > 0) {
       await loadFamilyMembers();
@@ -212,6 +239,7 @@ export function FixedBills() {
     setIsAddModalOpen(false);
     setEditingBill(null);
     reset();
+    setIsInstallment(false);
     setIsShared(false);
     setSelectedMembers([]);
     setSplitAmounts({});
@@ -231,6 +259,9 @@ export function FixedBills() {
         categoryId: data.categoryId || undefined,
         isShared,
         sharedWith,
+        totalInstallments: isInstallment ? data.totalInstallments : undefined,
+        startMonth: isInstallment ? (data.startMonth || month) : undefined,
+        startYear: isInstallment ? (data.startYear || year) : undefined,
       };
 
       if (editingBill) {
@@ -259,7 +290,7 @@ export function FixedBills() {
 
   const handlePayBill = async (billId: string) => {
     try {
-      await payBill.mutateAsync(billId);
+      await payBill.mutateAsync({ id: billId, year, month });
     } catch (error) {
       console.error('Failed to mark bill as paid:', error);
     }
@@ -273,11 +304,18 @@ export function FixedBills() {
     label: `${cat.emoji} ${cat.name}`,
   })) || [];
 
-  // Calendar grid (simple 31-day view)
-  const calendarDays = Array.from({ length: 31 }, (_, i) => i + 1);
+  // Calendar helpers
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const firstDayOfWeek = new Date(year, month - 1, 1).getDay(); // 0=Sun
+  const calendarDays = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
   const getBillsForDay = (day: number) => {
-    return fixedBills?.filter((bill) => bill.dueDay === day) || [];
+    return fixedBills?.filter((bill) => {
+      if (bill.dueDay === day) return true;
+      // Bills with dueDay > daysInMonth show on last day
+      if (day === daysInMonth && bill.dueDay > daysInMonth) return true;
+      return false;
+    }) || [];
   };
 
   return (
@@ -332,6 +370,13 @@ export function FixedBills() {
         </div>
       </div>
 
+      {/* Month Selector */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <MonthSelector selectedDate={selectedDate} onChange={setSelectedDate} />
+        </div>
+      </div>
+
       {/* Stats */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -350,12 +395,12 @@ export function FixedBills() {
             <StatCard
               label="Unpaid"
               value={summary?.unpaidCount || 0}
-              icon={<Circle size={20} />} 
+              icon={<Circle size={20} />}
               formatAsCurrency={false}
             />
             <StatCard
               label="Next Due"
-              value={nextBill ? `Day ${nextBill.dueDay}` : 'None'}
+              value={isCurrentMonth && nextBill ? `Day ${nextBill.dueDay}` : 'None'}
               icon={<TrendingUp size={20} />}
             />
           </div>
@@ -364,8 +409,8 @@ export function FixedBills() {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Overdue Bills Alert */}
-        {overdueBills.length > 0 && (
+        {/* Overdue Bills Alert (current month only) */}
+        {isCurrentMonth && overdueBills.length > 0 && (
           <Card padding="md" className="mb-6 border-error/30 bg-error-light/20">
             <div className="flex items-start gap-3">
               <AlertCircle size={20} className="text-error mt-0.5 shrink-0" />
@@ -418,8 +463,8 @@ export function FixedBills() {
           </Card>
         )}
 
-        {/* Upcoming Bills */}
-        {upcomingBills.length > 0 && (
+        {/* Upcoming Bills (current month only) */}
+        {isCurrentMonth && upcomingBills.length > 0 && (
           <Card padding="md" className="mb-6">
             <h3 className="text-base font-semibold text-gray-900 mb-4">
               Due in Next 7 Days ({upcomingBills.length})
@@ -520,7 +565,7 @@ export function FixedBills() {
           <Card padding="lg" className="text-center py-12">
             <div className="text-6xl mb-4">📅</div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              No fixed bills yet
+              No fixed bills for {format(selectedDate, 'MMMM yyyy')}
             </h3>
             <p className="text-sm text-gray-500 mb-6">
               Add your recurring bills to track and manage payments
@@ -533,9 +578,9 @@ export function FixedBills() {
           /* List View */
           <div className="space-y-3">
             {fixedBills.map((bill) => {
-              const daysUntil = getDaysUntilDue(bill.dueDay);
-              const isOverdue = daysUntil < 0 && !bill.isPaid;
-              const isDueSoon = daysUntil <= 3 && daysUntil >= 0 && !bill.isPaid;
+              const daysUntil = isCurrentMonth ? getDaysUntilDue(bill.dueDay) : 0;
+              const isOverdue = isCurrentMonth && daysUntil < 0 && !bill.isPaid;
+              const isDueSoon = isCurrentMonth && daysUntil <= 3 && daysUntil >= 0 && !bill.isPaid;
 
               return (
                 <Card
@@ -583,7 +628,7 @@ export function FixedBills() {
                             Overdue
                           </Badge>
                         )}
-                        {isDueSoon && !bill.isPaid && (
+                        {isDueSoon && (
                           <Badge color="warning" size="sm">Due Soon</Badge>
                         )}
                         {bill.isShared && (
@@ -592,20 +637,25 @@ export function FixedBills() {
                             Shared
                           </Badge>
                         )}
+                        {bill.totalInstallments && bill.currentInstallment && (
+                          <Badge color="accent" size="sm">
+                            {bill.currentInstallment}/{bill.totalInstallments}
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
                         <span>Due: Day {bill.dueDay}</span>
-                        <span>•</span>
+                        <span>·</span>
                         <span>{bill.recurrence === 'MONTHLY' ? 'Monthly' : 'Yearly'}</span>
                         {bill.category && (
                           <>
-                            <span>•</span>
+                            <span>·</span>
                             <span>{bill.category.name}</span>
                           </>
                         )}
-                        {!bill.isPaid && bill.recurrence === 'MONTHLY' && (
+                        {isCurrentMonth && !bill.isPaid && bill.recurrence === 'MONTHLY' && (
                           <>
-                            <span>•</span>
+                            <span>·</span>
                             <span className={cn(
                               isOverdue ? 'text-error font-medium' :
                               isDueSoon ? 'text-warning font-medium' :
@@ -617,7 +667,7 @@ export function FixedBills() {
                         )}
                         {bill.isShared && bill.sharedWith && bill.sharedWith.length > 0 && (
                           <>
-                            <span>•</span>
+                            <span>·</span>
                             <span className="text-accent">
                               with {bill.sharedWith.map((s) => s.sharedWith?.name).filter(Boolean).join(', ')}
                             </span>
@@ -636,9 +686,9 @@ export function FixedBills() {
                           {formatCurrency(bill.amount)}
                         </p>
                       )}
-                      {bill.isPaid && bill.lastPaidAt && (
+                      {bill.isPaid && bill.paidAt && (
                         <p className="text-xs text-gray-500">
-                          Paid {new Date(bill.lastPaidAt).toLocaleDateString('pt-BR')}
+                          Paid {new Date(bill.paidAt).toLocaleDateString('pt-BR')}
                         </p>
                       )}
                     </div>
@@ -677,18 +727,33 @@ export function FixedBills() {
         ) : (
           /* Calendar View */
           <Card padding="md">
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-7 gap-1">
+              {/* Day-of-week headers */}
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                <div key={day} className="text-center text-xs font-medium text-gray-500 py-2">
+                  {day}
+                </div>
+              ))}
+
+              {/* Empty cells for offset */}
+              {Array.from({ length: firstDayOfWeek }, (_, i) => (
+                <div key={`empty-${i}`} className="min-h-[100px]" />
+              ))}
+
+              {/* Actual days */}
               {calendarDays.map((day) => {
                 const bills = getBillsForDay(day);
                 const hasBills = bills.length > 0;
                 const hasUnpaid = bills.some((b) => !b.isPaid);
                 const totalAmount = bills.reduce((sum, b) => sum + b.userAmount, 0);
+                const isToday = isCurrentMonth && day === now.getDate();
 
                 return (
                   <div
                     key={day}
                     className={cn(
-                      'p-3 rounded-lg border-2 transition-all min-h-[100px]',
+                      'p-2 rounded-lg border-2 transition-all min-h-[100px]',
+                      isToday && 'ring-2 ring-accent/50',
                       hasBills
                         ? hasUnpaid
                           ? 'border-accent/30 bg-accent-light/10 hover:border-accent/50'
@@ -697,7 +762,12 @@ export function FixedBills() {
                     )}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold text-gray-900">{day}</span>
+                      <span className={cn(
+                        'text-sm font-semibold',
+                        isToday ? 'text-accent' : 'text-gray-900'
+                      )}>
+                        {day}
+                      </span>
                       {hasBills && (
                         <Badge color={hasUnpaid ? 'accent' : 'success'} size="sm">
                           {bills.length}
@@ -723,11 +793,18 @@ export function FixedBills() {
                               <span className="text-gray-600">
                                 {formatCurrency(bill.userAmount)}
                               </span>
-                              {bill.isPaid ? (
-                                <CheckCircle2 size={12} className="text-success" />
-                              ) : (
-                                <Circle size={12} className="text-gray-300" />
-                              )}
+                              <div className="flex items-center gap-1">
+                                {bill.totalInstallments && bill.currentInstallment && (
+                                  <span className="text-gray-400">
+                                    {bill.currentInstallment}/{bill.totalInstallments}
+                                  </span>
+                                )}
+                                {bill.isPaid ? (
+                                  <CheckCircle2 size={12} className="text-success" />
+                                ) : (
+                                  <Circle size={12} className="text-gray-300" />
+                                )}
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -831,6 +908,55 @@ export function FixedBills() {
             />
           </div>
 
+          {/* Installment purchase */}
+          <div className="space-y-3 pt-4 border-t border-gray-200">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isInstallment}
+                onChange={() => setIsInstallment(!isInstallment)}
+                className="w-4 h-4 rounded border-gray-300 text-accent focus:ring-accent"
+              />
+              <span className="text-sm font-medium text-gray-900">
+                Installment purchase
+              </span>
+            </label>
+
+            {isInstallment && (
+              <div className="pl-6 space-y-3">
+                <Input
+                  label="Number of installments"
+                  type="number"
+                  min="2"
+                  max="120"
+                  placeholder="e.g., 12"
+                  error={errors.totalInstallments?.message}
+                  {...register('totalInstallments', { valueAsNumber: true })}
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="Start month"
+                    type="number"
+                    min="1"
+                    max="12"
+                    placeholder="1-12"
+                    error={errors.startMonth?.message}
+                    {...register('startMonth', { valueAsNumber: true })}
+                  />
+                  <Input
+                    label="Start year"
+                    type="number"
+                    min="2020"
+                    max="2100"
+                    placeholder="e.g., 2026"
+                    error={errors.startYear?.message}
+                    {...register('startYear', { valueAsNumber: true })}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Share with family */}
           <div className="space-y-3 pt-4 border-t border-gray-200">
             <label className="flex items-center gap-2 cursor-pointer">
@@ -902,7 +1028,7 @@ export function FixedBills() {
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={16} className="text-success" />
                 <p className="text-sm text-success">
-                  This bill is marked as paid for this period
+                  This bill is marked as paid for {format(selectedDate, 'MMMM yyyy')}
                 </p>
               </div>
             </div>
