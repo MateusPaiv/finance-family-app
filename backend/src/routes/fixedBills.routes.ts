@@ -19,12 +19,15 @@ const fixedBillSchema = z.object({
   recurrence: z.enum(["MONTHLY", "YEARLY"]),
   isShared: z.boolean().optional(),
   sharedWith: z.array(sharedWithItemSchema).optional(),
+  totalInstallments: z.number().int().positive().optional(),
+  startMonth: z.number().int().min(1).max(12).optional(),
+  startYear: z.number().int().min(2000).max(2100).optional(),
 });
 
 const updateFixedBillSchema = fixedBillSchema.partial();
 
 // Shared include for all queries that return fixed bills
-const sharedWithInclude = {
+const billInclude = {
   category: true,
   sharedWith: {
     include: {
@@ -32,22 +35,62 @@ const sharedWithInclude = {
       createdBy: { select: { id: true, name: true, email: true } },
     },
   },
+  payments: true,
 };
 
-// Helper to serialize a fixed bill (convert Decimals to Numbers)
-// userAmount = total amount minus what others pay (the user's actual cost)
-function serializeBill(bill: any) {
+// Helper: get year/month from query or body, defaulting to current
+function getYearMonth(source: Record<string, any>): { year: number; month: number } {
+  const now = new Date();
+  const year = parseInt(source.year as string) || now.getFullYear();
+  const month = parseInt(source.month as string) || now.getMonth() + 1;
+  return { year, month };
+}
+
+// Helper: check if a bill is active for a given month (installment logic)
+function isActiveForMonth(bill: any, year: number, month: number): boolean {
+  if (bill.totalInstallments == null) return true; // infinite recurring
+  if (bill.startYear == null || bill.startMonth == null) return true;
+  const monthsElapsed = (year - bill.startYear) * 12 + (month - bill.startMonth);
+  const installment = monthsElapsed + 1;
+  return installment >= 1 && installment <= bill.totalInstallments;
+}
+
+// Helper: get current installment number
+function getCurrentInstallment(bill: any, year: number, month: number): number | null {
+  if (bill.totalInstallments == null || bill.startYear == null || bill.startMonth == null) {
+    return null;
+  }
+  const monthsElapsed = (year - bill.startYear) * 12 + (month - bill.startMonth);
+  return monthsElapsed + 1;
+}
+
+// Helper to serialize a fixed bill for a specific month
+function serializeBill(bill: any, year: number, month: number) {
   const amount = Number(bill.amount);
   const sharedWith = bill.sharedWith?.map((s: any) => ({
     ...s,
     splitAmount: Number(s.splitAmount),
   }));
   const othersTotal = sharedWith?.reduce((sum: number, s: any) => sum + s.splitAmount, 0) ?? 0;
+
+  // Check if paid for the given month
+  const paymentForMonth = bill.payments?.find(
+    (p: any) => p.year === year && p.month === month,
+  );
+
+  const currentInstallment = getCurrentInstallment(bill, year, month);
+
   return {
     ...bill,
     amount,
     userAmount: Math.round((amount - othersTotal) * 100) / 100,
     sharedWith,
+    isPaid: !!paymentForMonth,
+    paidAt: paymentForMonth?.paidAt || null,
+    currentInstallment,
+    totalInstallments: bill.totalInstallments,
+    isActiveForMonth: isActiveForMonth(bill, year, month),
+    payments: undefined, // Don't expose raw payment records
   };
 }
 
@@ -95,7 +138,9 @@ router.get(
       const userId = req.user!.userId;
       const now = new Date();
       const today = now.getDate();
-      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+      const daysInMonth = new Date(year, month, 0).getDate();
 
       // Calculate which due days fall within the next 7 days
       const upcomingDays: number[] = [];
@@ -107,14 +152,16 @@ router.get(
       const bills = await prisma.fixedBill.findMany({
         where: {
           userId,
-          isPaid: false,
           dueDay: { in: upcomingDays },
         },
-        include: sharedWithInclude,
+        include: billInclude,
         orderBy: { dueDay: "asc" },
       });
 
-      const data = bills.map(serializeBill);
+      // Filter to unpaid + active for current month
+      const data = bills
+        .map((b) => serializeBill(b, year, month))
+        .filter((b) => !b.isPaid && b.isActiveForMonth);
 
       res.json({ status: "success", data });
     } catch (error) {
@@ -129,13 +176,17 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = req.user!.userId;
+      const { year, month } = getYearMonth(req.query);
 
       const bills = await prisma.fixedBill.findMany({
         where: { userId, recurrence: "MONTHLY" },
-        include: sharedWithInclude,
+        include: billInclude,
       });
 
-      const serialized = bills.map(serializeBill);
+      const serialized = bills
+        .map((b) => serializeBill(b, year, month))
+        .filter((b) => b.isActiveForMonth);
+
       const totalMonthly = serialized.reduce((sum, b) => sum + b.userAmount, 0);
       const paid = serialized.filter((b) => b.isPaid);
       const unpaid = serialized.filter((b) => !b.isPaid);
@@ -166,14 +217,18 @@ router.get(
 router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId;
+    const { year, month } = getYearMonth(req.query);
 
     const bills = await prisma.fixedBill.findMany({
       where: { userId },
-      include: sharedWithInclude,
+      include: billInclude,
       orderBy: { dueDay: "asc" },
     });
 
-    const data = bills.map(serializeBill);
+    // Serialize with month context and filter to active bills
+    const data = bills
+      .map((b) => serializeBill(b, year, month))
+      .filter((b) => b.isActiveForMonth);
 
     res.json({ status: "success", data });
   } catch (error) {
@@ -186,10 +241,11 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     const userId = req.user!.userId;
+    const { year, month } = getYearMonth(req.query);
 
     const bill = await prisma.fixedBill.findUnique({
       where: { id },
-      include: sharedWithInclude,
+      include: billInclude,
     });
 
     if (!bill || bill.userId !== userId) {
@@ -199,7 +255,7 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
 
     res.json({
       status: "success",
-      data: serializeBill(bill),
+      data: serializeBill(bill, year, month),
     });
   } catch (error) {
     next(error);
@@ -214,6 +270,15 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
 
     const isShared = data.isShared && sharedWith && sharedWith.length > 0;
 
+    // Default startMonth/startYear to current if totalInstallments is provided
+    const now = new Date();
+    const startMonth = data.totalInstallments
+      ? data.startMonth ?? now.getMonth() + 1
+      : data.startMonth;
+    const startYear = data.totalInstallments
+      ? data.startYear ?? now.getFullYear()
+      : data.startYear;
+
     const bill = await prisma.$transaction(async (tx) => {
       const created = await tx.fixedBill.create({
         data: {
@@ -223,6 +288,9 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
           dueDay: data.dueDay,
           recurrence: data.recurrence,
           isShared: isShared || false,
+          totalInstallments: data.totalInstallments,
+          startMonth,
+          startYear,
           userId,
         },
       });
@@ -240,13 +308,14 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
 
       return tx.fixedBill.findUnique({
         where: { id: created.id },
-        include: sharedWithInclude,
+        include: billInclude,
       });
     });
 
+    const { year, month } = getYearMonth(req.query);
     res.status(201).json({
       status: "success",
-      data: serializeBill(bill),
+      data: serializeBill(bill, year, month),
     });
   } catch (error) {
     next(error);
@@ -267,7 +336,7 @@ router.put("/:id", async (req: Request, res: Response, next: NextFunction) => {
     }
 
     const bill = await prisma.$transaction(async (tx) => {
-      const updated = await tx.fixedBill.update({
+      await tx.fixedBill.update({
         where: { id },
         data: {
           ...data,
@@ -295,13 +364,14 @@ router.put("/:id", async (req: Request, res: Response, next: NextFunction) => {
 
       return tx.fixedBill.findUnique({
         where: { id },
-        include: sharedWithInclude,
+        include: billInclude,
       });
     });
 
+    const { year, month } = getYearMonth(req.query);
     res.json({
       status: "success",
-      data: serializeBill(bill),
+      data: serializeBill(bill, year, month),
     });
   } catch (error) {
     next(error);
@@ -338,6 +408,7 @@ router.post(
     try {
       const { id } = req.params;
       const userId = req.user!.userId;
+      const { year, month } = getYearMonth(req.body);
 
       const existing = await prisma.fixedBill.findUnique({ where: { id } });
       if (!existing || existing.userId !== userId) {
@@ -345,15 +416,23 @@ router.post(
         return;
       }
 
-      const bill = await prisma.fixedBill.update({
+      // Upsert payment record (idempotent)
+      await prisma.fixedBillPayment.upsert({
+        where: {
+          fixedBillId_year_month: { fixedBillId: id, year, month },
+        },
+        update: { paidAt: new Date() },
+        create: { fixedBillId: id, year, month },
+      });
+
+      const bill = await prisma.fixedBill.findUnique({
         where: { id },
-        data: { isPaid: true, lastPaidAt: new Date() },
-        include: sharedWithInclude,
+        include: billInclude,
       });
 
       res.json({
         status: "success",
-        data: serializeBill(bill),
+        data: serializeBill(bill, year, month),
       });
     } catch (error) {
       next(error);
@@ -368,6 +447,7 @@ router.post(
     try {
       const { id } = req.params;
       const userId = req.user!.userId;
+      const { year, month } = getYearMonth(req.body);
 
       const existing = await prisma.fixedBill.findUnique({ where: { id } });
       if (!existing || existing.userId !== userId) {
@@ -375,15 +455,19 @@ router.post(
         return;
       }
 
-      const bill = await prisma.fixedBill.update({
+      // Delete payment record for this month
+      await prisma.fixedBillPayment.deleteMany({
+        where: { fixedBillId: id, year, month },
+      });
+
+      const bill = await prisma.fixedBill.findUnique({
         where: { id },
-        data: { isPaid: false },
-        include: sharedWithInclude,
+        include: billInclude,
       });
 
       res.json({
         status: "success",
-        data: serializeBill(bill),
+        data: serializeBill(bill, year, month),
       });
     } catch (error) {
       next(error);

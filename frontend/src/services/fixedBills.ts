@@ -8,9 +8,14 @@ import type {
   UpdateFixedBillRequest,
 } from '@/types';
 
-export async function getFixedBills(): Promise<FixedBill[]> {
-  const { data } =
-    await api.get<ApiResponse<FixedBill[]>>('/api/fixed-bills');
+export async function getFixedBills(
+  year: number,
+  month: number,
+): Promise<FixedBill[]> {
+  const { data } = await api.get<ApiResponse<FixedBill[]>>(
+    '/api/fixed-bills',
+    { params: { year, month } },
+  );
   return data.data!;
 }
 
@@ -46,16 +51,26 @@ export async function deleteFixedBill(id: string): Promise<void> {
   await api.delete(`/api/fixed-bills/${id}`);
 }
 
-export async function payFixedBill(id: string): Promise<FixedBill> {
+export async function payFixedBill(
+  id: string,
+  year: number,
+  month: number,
+): Promise<FixedBill> {
   const { data } = await api.post<ApiResponse<FixedBill>>(
     `/api/fixed-bills/${id}/pay`,
+    { year, month },
   );
   return data.data!;
 }
 
-export async function resetFixedBill(id: string): Promise<FixedBill> {
+export async function resetFixedBill(
+  id: string,
+  year: number,
+  month: number,
+): Promise<FixedBill> {
   const { data } = await api.post<ApiResponse<FixedBill>>(
     `/api/fixed-bills/${id}/reset`,
+    { year, month },
   );
   return data.data!;
 }
@@ -74,9 +89,13 @@ export async function getUpcomingBills(): Promise<FixedBill[]> {
   return data.data!;
 }
 
-export async function getFixedBillsSummary(): Promise<FixedBillSummary> {
+export async function getFixedBillsSummary(
+  year: number,
+  month: number,
+): Promise<FixedBillSummary> {
   const { data } = await api.get<ApiResponse<FixedBillSummary>>(
     '/api/fixed-bills/summary/monthly',
+    { params: { year, month } },
   );
   return data.data!;
 }

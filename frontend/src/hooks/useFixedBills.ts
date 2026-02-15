@@ -2,10 +2,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as fixedBillsService from '@/services/fixedBills';
 import type { CreateFixedBillRequest, UpdateFixedBillRequest } from '@/types';
 
-export function useFixedBills() {
+export function useFixedBills(year?: number, month?: number) {
+  const now = new Date();
+  const y = year ?? now.getFullYear();
+  const m = month ?? now.getMonth() + 1;
+
   return useQuery({
-    queryKey: ['fixed-bills'],
-    queryFn: () => fixedBillsService.getFixedBills(),
+    queryKey: ['fixed-bills', y, m],
+    queryFn: () => fixedBillsService.getFixedBills(y, m),
   });
 }
 
@@ -24,10 +28,14 @@ export function useUpcomingBills() {
   });
 }
 
-export function useFixedBillsSummary() {
+export function useFixedBillsSummary(year?: number, month?: number) {
+  const now = new Date();
+  const y = year ?? now.getFullYear();
+  const m = month ?? now.getMonth() + 1;
+
   return useQuery({
-    queryKey: ['fixed-bills', 'summary'],
-    queryFn: () => fixedBillsService.getFixedBillsSummary(),
+    queryKey: ['fixed-bills', 'summary', y, m],
+    queryFn: () => fixedBillsService.getFixedBillsSummary(y, m),
   });
 }
 
@@ -77,7 +85,8 @@ export function usePayFixedBill() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => fixedBillsService.payFixedBill(id),
+    mutationFn: ({ id, year, month }: { id: string; year: number; month: number }) =>
+      fixedBillsService.payFixedBill(id, year, month),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fixed-bills'] });
     },
@@ -88,7 +97,8 @@ export function useResetFixedBill() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => fixedBillsService.resetFixedBill(id),
+    mutationFn: ({ id, year, month }: { id: string; year: number; month: number }) =>
+      fixedBillsService.resetFixedBill(id, year, month),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fixed-bills'] });
     },
