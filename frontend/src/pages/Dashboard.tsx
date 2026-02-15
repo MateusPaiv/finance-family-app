@@ -6,6 +6,8 @@ import {
   Calendar,
   CreditCard,
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -24,12 +26,20 @@ import { cn } from '@/lib/utils';
 export function Dashboard() {
   const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [expensesPage, setExpensesPage] = useState(1);
 
   const year = selectedDate.getFullYear();
   const month = selectedDate.getMonth() + 1;
 
+  // Pagination settings for recent expenses
+  const EXPENSES_PER_PAGE = 5;
+  const expensesOffset = (expensesPage - 1) * EXPENSES_PER_PAGE;
+
   // Fetch data
-  const { data: expensesData } = useExpenses({ limit: 10 });
+  const { data: expensesData } = useExpenses({
+    limit: EXPENSES_PER_PAGE,
+    offset: expensesOffset
+  });
   const { data: summary } = useMonthlySummary(year, month);
   const { data: fixedBills } = useFixedBills();
   const { data: fixedBillsSummary } = useFixedBillsSummary();
@@ -60,7 +70,9 @@ export function Dashboard() {
     .slice(0, 5) || [];
 
   // Recent expenses
-  const recentExpenses = expensesData?.data?.slice(0, 10) || [];
+  const recentExpenses = expensesData?.data || [];
+  const totalExpenses = expensesData?.pagination?.total || 0;
+  const totalExpensesPages = Math.ceil(totalExpenses / EXPENSES_PER_PAGE);
 
   // Payment method spending
   const paymentMethodSpending = summary?.byPaymentMethod || [];
@@ -318,11 +330,45 @@ export function Dashboard() {
                 No expenses yet. Add your first expense to get started.
               </p>
             ) : (
-              <div className="space-y-3">
-                {recentExpenses.map((expense) => (
-                  <ExpenseCard key={expense.id} expense={expense} />
-                ))}
-              </div>
+              <>
+                <div className="space-y-3">
+                  {recentExpenses.map((expense) => (
+                    <ExpenseCard key={expense.id} expense={expense} />
+                  ))}
+                </div>
+
+                {/* Pagination Controls */}
+                {totalExpensesPages > 1 && (
+                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+                    <p className="text-sm text-gray-600">
+                      Page {expensesPage} of {totalExpensesPages}
+                      <span className="text-gray-400 ml-2">
+                        ({totalExpenses} total)
+                      </span>
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={<ChevronLeft size={16} />}
+                        onClick={() => setExpensesPage((prev) => Math.max(1, prev - 1))}
+                        disabled={expensesPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={<ChevronRight size={16} />}
+                        onClick={() => setExpensesPage((prev) => Math.min(totalExpensesPages, prev + 1))}
+                        disabled={expensesPage === totalExpensesPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </Card>
         </div>
